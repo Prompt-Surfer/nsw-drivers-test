@@ -1,0 +1,28 @@
+@import "tailwindcss";
+
+@layer utilities {
+  body {
+    min-height: 100vh;
+    transition: background 0.5s ease-out;
+    background-attachment: fixed; /* This ensures the gradient stays fixed during scroll */
+  }
+  
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+  
+  /* Section spacing and animations */
+  section {
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.8s ease, transform 0.8s ease;
+    position: relative; /* Ensure sections sit on top of the background */
+    z-index: 1;
+  }
+  
+  section.in-viewport {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
