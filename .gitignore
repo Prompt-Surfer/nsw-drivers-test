@@ -10,6 +10,8 @@ test-results/
 playwright-report/
 playwright/.cache/
 
+data/
+
 **/.env
 
 .DS_Store
