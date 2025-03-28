@@ -68,7 +68,6 @@ fn LocationsTable(
                     {move || {
                         let locations = sorted_locations.get();
                         let booking_data = booking_map.get();
-                        log::info!("Rendering {} sorted locations", locations.len());
                         
                         locations.into_iter().map(|(loc, distance)| {
                             let location_id = loc.id.to_string();
@@ -146,7 +145,7 @@ pub fn HomePage() -> impl IntoView {
                 leptos::logging::log!("Triggering refresh");
                 fetch_bookings();
             },
-            Duration::from_secs(30)
+            Duration::from_secs(600)
         ).expect("failed to set interval");
         
         on_cleanup(move || {

@@ -26,6 +26,7 @@ RUN apt-get install -y libxss1 libappindicator1 libgconf-2-4 \
 
 # Fetch the latest version numbers and URLs for Chrome and ChromeDriver
 RUN curl -s https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json > /tmp/versions.json
+
 # Install Chrome
 RUN CHROME_URL=$(jq -r '.channels.Stable.downloads.chrome[] | select(.platform=="linux64") | .url' /tmp/versions.json) && \
     wget -q --continue -O /tmp/chrome-linux64.zip $CHROME_URL && \
@@ -52,16 +53,19 @@ RUN rm /tmp/chrome-linux64.zip /tmp/chromedriver-linux64.zip /tmp/versions.json
 # Copy everything from the builder
 COPY --from=builder /app /app
 
+# Make sure site directory has proper permissions
+RUN chmod -R 755 /app/target/site
+
 # Set any required env variables
 ENV RUST_LOG="info"
 ENV APP_ENVIRONMENT="production"
 ENV LEPTOS_SITE_ADDR="0.0.0.0:8080"
-ENV LEPTOS_SITE_ROOT="site"
+ENV LEPTOS_SITE_ROOT="/app/target/site"
+ENV SELENIUM_DRIVER_URL="http://localhost:57908"
 
 # Set working directory
 WORKDIR /app
 
 EXPOSE 8080
 # Run ChromeDriver and the server
-CMD chromedriver --port=57908 --whitelisted-ips='' --disable-dev-shm-usage --no-sandbox & /app/target/release/nsw-closest-display
-
+CMD chromedriver --port=57908 --whitelisted-ips='' --verbose --disable-dev-shm-usage --no-sandbox & /app/target/release/nsw-closest-display
