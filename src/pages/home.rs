@@ -307,9 +307,10 @@ fn LocationRow(
                                                 </svg>
                                             </span>
                                             <div 
-                                                class="absolute left-0 bottom-full mb-2 inline-block max-w-40 bg-gray-700 bg-opacity-90 text-white text-xs rounded py-1.5 px-2 z-10 shadow-md transition-opacity duration-150"
-                                                style:opacity={move || if tooltip_visible.get() { "1" } else { "0" }}
-                                                style:pointer-events={move || if tooltip_visible.get() { "auto" } else { "none" }}
+                                                class={move || format!("absolute left-0 bottom-full mb-2 inline-block max-w-40 bg-gray-700 bg-opacity-90 text-white text-xs rounded py-1.5 px-2 z-10 shadow-md transition-opacity duration-150 {} {}", 
+                                                    if tooltip_visible.get() { "opacity-100" } else { "opacity-0" },
+                                                    if tooltip_visible.get() { "pointer-events-auto" } else { "pointer-events-none" }
+                                                )}
                                             >
                                                 Less than 1000 tests
                                             </div>
@@ -325,7 +326,7 @@ fn LocationRow(
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-center">
                     <span class={move || {
                         if expanded.get() {
-                            "transform rotate-180 inline-block transition-all duration-200 text-blue-600"
+                            "rotate-180 inline-block transition-all duration-200 text-blue-600"
                         } else {
                             "inline-block transition-all duration-200 text-gray-500"
                         }
