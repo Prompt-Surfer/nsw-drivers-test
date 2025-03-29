@@ -3,660 +3,990 @@
     "id": 17,
     "name": "Albury",
     "latitude": -36.0751193,
-    "longitude": 146.9094852
+    "longitude": 146.9094852,
+    "passes": 4175,
+    "failures": 2594,
+    "pass_rate": 61.67823903087605
   },
   {
     "id": 18,
     "name": "Armidale",
     "latitude": -30.5035714,
-    "longitude": 151.6523371
+    "longitude": 151.6523371,
+    "passes": 3206,
+    "failures": 1809,
+    "pass_rate": 63.92821535393819
   },
   {
     "id": 112,
     "name": "Auburn",
     "latitude": -33.8603378,
-    "longitude": 151.023592
+    "longitude": 151.023592,
+    "passes": 5376,
+    "failures": 5806,
+    "pass_rate": 48.07726703630835
   },
   {
     "id": 19,
     "name": "Ballina",
     "latitude": -28.8627985,
-    "longitude": 153.5658162
+    "longitude": 153.5658162,
+    "passes": 3026,
+    "failures": 1539,
+    "pass_rate": 66.28696604600219
   },
   {
     "id": 20,
     "name": "Bankstown",
     "latitude": -33.9177861,
-    "longitude": 151.0263741
+    "longitude": 151.0263741,
+    "passes": 5557,
+    "failures": 5346,
+    "pass_rate": 50.967623589837665
   },
   {
     "id": 21,
     "name": "Batemans Bay",
     "latitude": -35.7162174,
-    "longitude": 150.1794566
+    "longitude": 150.1794566,
+    "passes": 331,
+    "failures": 162,
+    "pass_rate": 67.13995943204868
   },
   {
     "id": 22,
     "name": "Bathurst",
     "latitude": -33.4111857,
-    "longitude": 149.578693
+    "longitude": 149.578693,
+    "passes": 3332,
+    "failures": 1922,
+    "pass_rate": 63.41834792539019
   },
   {
     "id": 23,
     "name": "Bega",
     "latitude": -36.6742897,
-    "longitude": 149.8432479
+    "longitude": 149.8432479,
+    "passes": 1755,
+    "failures": 907,
+    "pass_rate": 65.92787377911344
   },
   {
     "id": 26,
     "name": "Blacktown",
     "latitude": -33.7660982,
-    "longitude": 150.9126927
+    "longitude": 150.9126927,
+    "passes": 23067,
+    "failures": 20520,
+    "pass_rate": 52.92174272145365
   },
   {
     "id": 27,
     "name": "Blue Mountains",
     "latitude": -33.3856304,
-    "longitude": 150.4865272
+    "longitude": 150.4865272,
+    "passes": 2715,
+    "failures": 1769,
+    "pass_rate": 60.548617305976805
   },
   {
     "id": 28,
     "name": "Bondi Junction",
     "latitude": -33.8928168,
-    "longitude": 151.2551822
+    "longitude": 151.2551822,
+    "passes": 14058,
+    "failures": 13137,
+    "pass_rate": 51.69332597904026
   },
   {
     "id": 29,
     "name": "Botany",
     "latitude": -33.9469267,
-    "longitude": 151.1973167
+    "longitude": 151.1973167,
+    "passes": 11593,
+    "failures": 9413,
+    "pass_rate": 55.18899362087023
   },
   {
     "id": 30,
     "name": "Broken Hill",
     "latitude": -31.9595859,
-    "longitude": 141.4608138
+    "longitude": 141.4608138,
+    "passes": 1383,
+    "failures": 780,
+    "pass_rate": 63.938973647711514
   },
   {
     "id": 77,
     "name": "Brookvale",
     "latitude": -33.76497,
-    "longitude": 151.2704476
+    "longitude": 151.2704476,
+    "passes": 4974,
+    "failures": 4230,
+    "pass_rate": 54.04172099087353
   },
   {
     "id": 34,
     "name": "Casino",
     "latitude": -28.8583975,
-    "longitude": 153.0469677
+    "longitude": 153.0469677,
+    "passes": 2210,
+    "failures": 1257,
+    "pass_rate": 63.74387078165561
   },
   {
     "id": 35,
     "name": "Castle Hill",
     "latitude": -33.7348232,
-    "longitude": 151.0030714
+    "longitude": 151.0030714,
+    "passes": 8596,
+    "failures": 6469,
+    "pass_rate": 57.059409226684366
   },
   {
     "id": 36,
     "name": "Cessnock",
     "latitude": -32.8321587,
-    "longitude": 151.3558797
+    "longitude": 151.3558797,
+    "passes": 3626,
+    "failures": 2123,
+    "pass_rate": 63.07183858062272
   },
   {
     "id": 37,
     "name": "Chatswood",
     "latitude": -33.7960696,
-    "longitude": 151.1780469
+    "longitude": 151.1780469,
+    "passes": 15755,
+    "failures": 15502,
+    "pass_rate": 50.40470934510669
   },
   {
     "id": 39,
     "name": "Coffs Harbour",
     "latitude": -30.2962013,
-    "longitude": 153.1138924
+    "longitude": 153.1138924,
+    "passes": 5204,
+    "failures": 3662,
+    "pass_rate": 58.69614256711031
   },
   {
     "id": 40,
     "name": "Cooma",
     "latitude": -36.2345567,
-    "longitude": 149.1270444
+    "longitude": 149.1270444,
+    "passes": 1904,
+    "failures": 876,
+    "pass_rate": 68.48920863309353
   },
   {
     "id": 42,
     "name": "Cootamundra",
     "latitude": -34.6386855,
-    "longitude": 148.0240849
+    "longitude": 148.0240849,
+    "passes": 1190,
+    "failures": 909,
+    "pass_rate": 56.69366364935684
   },
   {
     "id": 43,
     "name": "Corrimal",
     "latitude": -34.37319300000001,
-    "longitude": 150.8969115
+    "longitude": 150.8969115,
+    "passes": 7302,
+    "failures": 6346,
+    "pass_rate": 53.50234466588512
   },
   {
     "id": 44,
     "name": "Cowra",
     "latitude": -33.8346839,
-    "longitude": 148.6911799
+    "longitude": 148.6911799,
+    "passes": 1095,
+    "failures": 888,
+    "pass_rate": 55.21936459909228
   },
   {
     "id": 45,
     "name": "Deniliquin",
     "latitude": -35.5347037,
-    "longitude": 144.9487606
+    "longitude": 144.9487606,
+    "passes": 0,
+    "failures": 0,
+    "pass_rate": 0.0
   },
   {
     "id": 46,
     "name": "Dubbo",
     "latitude": -32.2443908,
-    "longitude": 148.614418
+    "longitude": 148.614418,
+    "passes": 3273,
+    "failures": 2763,
+    "pass_rate": 54.22465208747514
   },
   {
     "id": 581,
     "name": "Eastgardens",
     "latitude": -33.944183,
-    "longitude": 151.2268162
+    "longitude": 151.2268162,
+    "passes": 12461,
+    "failures": 10525,
+    "pass_rate": 54.21125902723397
   },
   {
     "id": 47,
     "name": "Eden",
     "latitude": -37.0622935,
-    "longitude": 149.904915
+    "longitude": 149.904915,
+    "passes": 557,
+    "failures": 348,
+    "pass_rate": 61.546961325966855
   },
   {
     "id": 501,
     "name": "Edmondson Park",
     "latitude": -33.9606778,
-    "longitude": 150.8622496
+    "longitude": 150.8622496,
+    "passes": 9203,
+    "failures": 7857,
+    "pass_rate": 53.944900351699886
   },
   {
     "id": 381,
     "name": "Engadine",
     "latitude": -34.0645874,
-    "longitude": 151.0135948
+    "longitude": 151.0135948,
+    "passes": 7047,
+    "failures": 4653,
+    "pass_rate": 60.23076923076923
   },
   {
     "id": 49,
     "name": "Erina",
     "latitude": -33.4338169,
-    "longitude": 151.3900807
+    "longitude": 151.3900807,
+    "passes": 3129,
+    "failures": 1777,
+    "pass_rate": 63.77904606604158
   },
   {
     "id": 51,
     "name": "Finley",
     "latitude": -35.6417544,
-    "longitude": 145.5777193
+    "longitude": 145.5777193,
+    "passes": 907,
+    "failures": 471,
+    "pass_rate": 65.8200290275762
   },
   {
     "id": 53,
     "name": "Forbes",
     "latitude": -33.3844596,
-    "longitude": 148.0080975
+    "longitude": 148.0080975,
+    "passes": 936,
+    "failures": 972,
+    "pass_rate": 49.056603773584904
   },
   {
     "id": 56,
     "name": "Glen Innes",
     "latitude": -29.7413084,
-    "longitude": 151.7374656
+    "longitude": 151.7374656,
+    "passes": 730,
+    "failures": 297,
+    "pass_rate": 71.08081791626095
   },
   {
     "id": 661,
     "name": "Glenmore Park",
     "latitude": -33.7867494,
-    "longitude": 150.6696793
+    "longitude": 150.6696793,
+    "passes": 2418,
+    "failures": 1574,
+    "pass_rate": 60.571142284569135
   },
   {
     "id": 57,
     "name": "Gosford",
     "latitude": -33.426667,
-    "longitude": 151.341667
+    "longitude": 151.341667,
+    "passes": 4220,
+    "failures": 2562,
+    "pass_rate": 62.223532881156
   },
   {
     "id": 58,
     "name": "Goulburn",
     "latitude": -34.7567489,
-    "longitude": 149.713629
+    "longitude": 149.713629,
+    "passes": 2636,
+    "failures": 1785,
+    "pass_rate": 59.62451933951595
   },
   {
     "id": 59,
     "name": "Grafton",
     "latitude": -29.681468,
-    "longitude": 152.9381272
+    "longitude": 152.9381272,
+    "passes": 2553,
+    "failures": 1897,
+    "pass_rate": 57.37078651685393
   },
   {
     "id": 60,
     "name": "Griffith",
     "latitude": -34.2886639,
-    "longitude": 146.0323982
+    "longitude": 146.0323982,
+    "passes": 3199,
+    "failures": 2165,
+    "pass_rate": 59.63832960477256
   },
   {
     "id": 61,
     "name": "Gunnedah",
     "latitude": -30.97943189999999,
-    "longitude": 150.2565037
+    "longitude": 150.2565037,
+    "passes": 1292,
+    "failures": 768,
+    "pass_rate": 62.71844660194175
   },
   {
     "id": 62,
     "name": "Hay",
     "latitude": -34.5042009,
-    "longitude": 144.8444508
+    "longitude": 144.8444508,
+    "passes": 333,
+    "failures": 135,
+    "pass_rate": 71.15384615384616
   },
   {
     "id": 63,
     "name": "Hornsby",
     "latitude": -33.7046328,
-    "longitude": 151.0987055
+    "longitude": 151.0987055,
+    "passes": 8863,
+    "failures": 7773,
+    "pass_rate": 53.276027891320034
   },
   {
     "id": 66,
     "name": "Inverell",
     "latitude": -29.7739244,
-    "longitude": 151.1114386
+    "longitude": 151.1114386,
+    "passes": 1280,
+    "failures": 261,
+    "pass_rate": 83.06294613887087
   },
   {
     "id": 67,
     "name": "Kempsey",
     "latitude": -31.0804831,
-    "longitude": 152.8418039
+    "longitude": 152.8418039,
+    "passes": 2124,
+    "failures": 1195,
+    "pass_rate": 63.995179270864725
   },
   {
     "id": 68,
     "name": "Kiama",
     "latitude": -34.669198,
-    "longitude": 150.8528343
+    "longitude": 150.8528343,
+    "passes": 3708,
+    "failures": 2742,
+    "pass_rate": 57.48837209302325
   },
   {
     "id": 69,
     "name": "Leeton",
     "latitude": -34.5517791,
-    "longitude": 146.4055582
+    "longitude": 146.4055582,
+    "passes": 1676,
+    "failures": 1053,
+    "pass_rate": 61.41443752290216
   },
   {
     "id": 71,
     "name": "Lightning Ridge",
     "latitude": -29.4278207,
-    "longitude": 147.9789993
+    "longitude": 147.9789993,
+    "passes": 205,
+    "failures": 120,
+    "pass_rate": 63.07692307692307
   },
   {
     "id": 72,
     "name": "Lismore",
     "latitude": -28.80943079999999,
-    "longitude": 153.287891
+    "longitude": 153.287891,
+    "passes": 4193,
+    "failures": 2276,
+    "pass_rate": 64.81681867367445
   },
   {
     "id": 73,
     "name": "Lithgow",
     "latitude": -33.48114899999999,
-    "longitude": 150.136782
+    "longitude": 150.136782,
+    "passes": 2848,
+    "failures": 1568,
+    "pass_rate": 64.4927536231884
   },
   {
     "id": 74,
     "name": "Liverpool",
     "latitude": -33.9285567,
-    "longitude": 150.9179595
+    "longitude": 150.9179595,
+    "passes": 16459,
+    "failures": 14932,
+    "pass_rate": 52.432225797203024
   },
   {
     "id": 32,
     "name": "Macarthur",
     "latitude": -33.9836006,
-    "longitude": 150.8933588
+    "longitude": 150.8933588,
+    "passes": 13464,
+    "failures": 11045,
+    "pass_rate": 54.93492186543719
   },
   {
     "id": 75,
     "name": "Maclean",
     "latitude": -29.4605789,
-    "longitude": 153.201936
+    "longitude": 153.201936,
+    "passes": 234,
+    "failures": 186,
+    "pass_rate": 55.714285714285715
   },
   {
     "id": 641,
     "name": "Macquarie Fields",
     "latitude": -33.9836006,
-    "longitude": 150.8933588
+    "longitude": 150.8933588,
+    "passes": 12198,
+    "failures": 9645,
+    "pass_rate": 55.84397747562148
   },
   {
     "id": 76,
     "name": "Maitland",
     "latitude": -32.7315527,
-    "longitude": 151.5525086
+    "longitude": 151.5525086,
+    "passes": 5700,
+    "failures": 4069,
+    "pass_rate": 58.347834988228065
   },
   {
     "id": 79,
     "name": "Marrickville",
     "latitude": -33.9105503,
-    "longitude": 151.1563555
+    "longitude": 151.1563555,
+    "passes": 13694,
+    "failures": 11435,
+    "pass_rate": 54.494806796927854
   },
   {
     "id": 521,
     "name": "Merrylands",
     "latitude": -33.835802,
-    "longitude": 150.9865196
+    "longitude": 150.9865196,
+    "passes": 34143,
+    "failures": 36146,
+    "pass_rate": 48.575168234005325
   },
   {
     "id": 81,
     "name": "Miranda",
     "latitude": -34.0299364,
-    "longitude": 151.1055499
+    "longitude": 151.1055499,
+    "passes": 2123,
+    "failures": 1379,
+    "pass_rate": 60.62250142775557
   },
   {
     "id": 82,
     "name": "Mittagong",
     "latitude": -34.4510275,
-    "longitude": 150.4474434
+    "longitude": 150.4474434,
+    "passes": 3862,
+    "failures": 2641,
+    "pass_rate": 59.387974780870366
   },
   {
     "id": 401,
     "name": "Howell Oval Penrith",
     "latitude": -33.7598756,
-    "longitude": 150.6864002
+    "longitude": 150.6864002,
+    "passes": 10961,
+    "failures": 8749,
+    "pass_rate": 55.61136478944698
   },
   {
     "id": 601,
     "name": "Auburn PCYC",
     "latitude": -33.8500403,
-    "longitude": 151.0706373
+    "longitude": 151.0706373,
+    "passes": 13728,
+    "failures": 13967,
+    "pass_rate": 49.56851417223326
   },
   {
     "id": 83,
     "name": "Moree",
     "latitude": -29.465303,
-    "longitude": 149.8415676
+    "longitude": 149.8415676,
+    "passes": 1343,
+    "failures": 669,
+    "pass_rate": 66.74950298210736
   },
   {
     "id": 84,
     "name": "Moruya",
     "latitude": -35.9056079,
-    "longitude": 150.0817689
+    "longitude": 150.0817689,
+    "passes": 1727,
+    "failures": 797,
+    "pass_rate": 68.42313787638669
   },
   {
     "id": 86,
     "name": "Mudgee",
     "latitude": -32.5992508,
-    "longitude": 149.5871313
+    "longitude": 149.5871313,
+    "passes": 1807,
+    "failures": 657,
+    "pass_rate": 73.33603896103897
   },
   {
     "id": 87,
     "name": "Murwillumbah",
     "latitude": -28.3273536,
-    "longitude": 153.3958252
+    "longitude": 153.3958252,
+    "passes": 5153,
+    "failures": 2003,
+    "pass_rate": 72.00950251537172
   },
   {
     "id": 88,
     "name": "Muswellbrook",
     "latitude": -32.2633254,
-    "longitude": 150.8888405
+    "longitude": 150.8888405,
+    "passes": 2778,
+    "failures": 1967,
+    "pass_rate": 58.54583772391992
   },
   {
     "id": 89,
     "name": "Nambucca Heads",
     "latitude": -30.6423737,
-    "longitude": 153.0027894
+    "longitude": 153.0027894,
+    "passes": 1509,
+    "failures": 912,
+    "pass_rate": 62.32961586121437
   },
   {
     "id": 91,
     "name": "Narooma",
     "latitude": -36.2205883,
-    "longitude": 150.1329238
+    "longitude": 150.1329238,
+    "passes": 276,
+    "failures": 120,
+    "pass_rate": 69.6969696969697
   },
   {
     "id": 92,
     "name": "Narrabri",
     "latitude": -30.3205203,
-    "longitude": 149.7819951
+    "longitude": 149.7819951,
+    "passes": 1237,
+    "failures": 905,
+    "pass_rate": 57.74976657329598
   },
   {
     "id": 93,
     "name": "Narrandera",
     "latitude": -34.7478672,
-    "longitude": 146.550356
+    "longitude": 146.550356,
+    "passes": 526,
+    "failures": 333,
+    "pass_rate": 61.23399301513388
   },
   {
     "id": 94,
     "name": "Nelson Bay",
     "latitude": -32.7207997,
-    "longitude": 152.1414358
+    "longitude": 152.1414358,
+    "passes": 1471,
+    "failures": 1225,
+    "pass_rate": 54.56231454005934
   },
   {
     "id": 95,
     "name": "Newcastle",
     "latitude": -32.9245472,
-    "longitude": 151.729877
+    "longitude": 151.729877,
+    "passes": 7803,
+    "failures": 6177,
+    "pass_rate": 55.81545064377682
   },
   {
     "id": 621,
     "name": "North Rocks",
     "latitude": -33.7750537,
-    "longitude": 151.0238278
+    "longitude": 151.0238278,
+    "passes": 7651,
+    "failures": 6953,
+    "pass_rate": 52.389756231169535
   },
   {
     "id": 98,
     "name": "Nowra",
     "latitude": -34.8830105,
-    "longitude": 150.5977256
+    "longitude": 150.5977256,
+    "passes": 1850,
+    "failures": 1018,
+    "pass_rate": 64.50488145048816
   },
   {
     "id": 99,
     "name": "Nyngan",
     "latitude": -31.5592276,
-    "longitude": 147.188948
+    "longitude": 147.188948,
+    "passes": 642,
+    "failures": 339,
+    "pass_rate": 65.4434250764526
   },
   {
     "id": 100,
     "name": "Orange",
     "latitude": -33.2815802,
-    "longitude": 149.0862242
+    "longitude": 149.0862242,
+    "passes": 7704,
+    "failures": 5039,
+    "pass_rate": 60.45672133720474
   },
   {
     "id": 102,
     "name": "Parkes",
     "latitude": -33.1356614,
-    "longitude": 148.1744534
+    "longitude": 148.1744534,
+    "passes": 1268,
+    "failures": 1187,
+    "pass_rate": 51.64969450101833
   },
   {
     "id": 104,
     "name": "Penrith",
     "latitude": -33.7794861,
-    "longitude": 150.7699907
+    "longitude": 150.7699907,
+    "passes": 6236,
+    "failures": 5512,
+    "pass_rate": 53.08137555328567
   },
   {
     "id": 105,
     "name": "Port Macquarie",
     "latitude": -31.4349036,
-    "longitude": 152.9001817
+    "longitude": 152.9001817,
+    "passes": 1278,
+    "failures": 656,
+    "pass_rate": 66.08066184074457
   },
   {
     "id": 106,
     "name": "Queanbeyan",
     "latitude": -35.3530392,
-    "longitude": 149.230896
+    "longitude": 149.230896,
+    "passes": 4473,
+    "failures": 3683,
+    "pass_rate": 54.843060323688086
   },
   {
     "id": 107,
     "name": "Raymond Terrace",
     "latitude": -32.7573408,
-    "longitude": 151.748173
+    "longitude": 151.748173,
+    "passes": 2083,
+    "failures": 1352,
+    "pass_rate": 60.64046579330422
   },
   {
     "id": 382,
     "name": "Revesby",
     "latitude": -33.9452471,
-    "longitude": 151.018035
+    "longitude": 151.018035,
+    "passes": 2415,
+    "failures": 2908,
+    "pass_rate": 45.369152733421004
   },
   {
     "id": 108,
     "name": "Richmond",
     "latitude": -33.5991852,
-    "longitude": 150.7519067
+    "longitude": 150.7519067,
+    "passes": 1938,
+    "failures": 1563,
+    "pass_rate": 55.35561268209083
   },
   {
     "id": 109,
     "name": "Rockdale",
     "latitude": -33.9529076,
-    "longitude": 151.1375572
+    "longitude": 151.1375572,
+    "passes": 2849,
+    "failures": 2012,
+    "pass_rate": 58.609339642048965
   },
   {
     "id": 421,
     "name": "Roselands",
     "latitude": -33.9369131,
-    "longitude": 151.074461
+    "longitude": 151.074461,
+    "passes": 21804,
+    "failures": 20035,
+    "pass_rate": 52.11405626329502
   },
   {
     "id": 96,
     "name": "Ryde",
     "latitude": -33.7767187,
-    "longitude": 151.1205172
+    "longitude": 151.1205172,
+    "passes": 11084,
+    "failures": 10837,
+    "pass_rate": 50.56338670681082
   },
   {
     "id": 241,
     "name": "Silverwater",
     "latitude": -33.8339902,
-    "longitude": 151.0482995
+    "longitude": 151.0482995,
+    "passes": 9032,
+    "failures": 10236,
+    "pass_rate": 46.87564874403156
   },
   {
     "id": 113,
     "name": "Singleton",
     "latitude": -32.5682823,
-    "longitude": 151.1795485
+    "longitude": 151.1795485,
+    "passes": 1914,
+    "failures": 1149,
+    "pass_rate": 62.48775710088149
   },
   {
     "id": 114,
     "name": "Springwood",
     "latitude": -33.6991869,
-    "longitude": 150.5711133
+    "longitude": 150.5711133,
+    "passes": 2574,
+    "failures": 1663,
+    "pass_rate": 60.75053103611046
   },
   {
     "id": 561,
     "name": "St Marys",
     "latitude": -33.7794861,
-    "longitude": 150.7699907
+    "longitude": 150.7699907,
+    "passes": 5374,
+    "failures": 5165,
+    "pass_rate": 50.9915551760129
   },
   {
     "id": 116,
     "name": "Tamworth",
     "latitude": -31.09003839999999,
-    "longitude": 150.9293323
+    "longitude": 150.9293323,
+    "passes": 4638,
+    "failures": 3629,
+    "pass_rate": 56.10257650901174
   },
   {
     "id": 117,
     "name": "Taree",
     "latitude": -31.8888549,
-    "longitude": 152.4439724
+    "longitude": 152.4439724,
+    "passes": 2460,
+    "failures": 1652,
+    "pass_rate": 59.824902723735406
   },
   {
     "id": 281,
     "name": "Toronto",
     "latitude": -33.0133179,
-    "longitude": 151.5931794
+    "longitude": 151.5931794,
+    "passes": 7393,
+    "failures": 4850,
+    "pass_rate": 60.38552642326227
   },
   {
     "id": 122,
     "name": "Toukley",
     "latitude": -33.263838,
-    "longitude": 151.5409676
+    "longitude": 151.5409676,
+    "passes": 0,
+    "failures": 0,
+    "pass_rate": 0.0
   },
   {
     "id": 140,
     "name": "Tuggerah",
     "latitude": -33.3092714,
-    "longitude": 151.4174771
+    "longitude": 151.4174771,
+    "passes": 7802,
+    "failures": 4087,
+    "pass_rate": 65.62368575994617
   },
   {
     "id": 123,
     "name": "Tumut",
     "latitude": -35.31086579999999,
-    "longitude": 148.231162
+    "longitude": 148.231162,
+    "passes": 167,
+    "failures": 129,
+    "pass_rate": 56.41891891891891
   },
   {
     "id": 54,
     "name": "Tuncurry",
     "latitude": -32.1683406,
-    "longitude": 152.4966491
+    "longitude": 152.4966491,
+    "passes": 2148,
+    "failures": 1524,
+    "pass_rate": 58.496732026143796
   },
   {
     "id": 124,
     "name": "Tweed Heads",
     "latitude": -28.178817,
-    "longitude": 153.5370553
+    "longitude": 153.5370553,
+    "passes": 181,
+    "failures": 76,
+    "pass_rate": 70.42801556420234
   },
   {
     "id": 125,
     "name": "Ulladulla",
     "latitude": -35.3627169,
-    "longitude": 150.4736927
+    "longitude": 150.4736927,
+    "passes": 3313,
+    "failures": 1515,
+    "pass_rate": 68.62054681027341
   },
   {
     "id": 127,
     "name": "Wagga Wagga",
     "latitude": -35.1025977,
-    "longitude": 147.3655103
+    "longitude": 147.3655103,
+    "passes": 5325,
+    "failures": 3839,
+    "pass_rate": 58.107813182016585
   },
   {
     "id": 128,
     "name": "Walgett",
     "latitude": -30.0215209,
-    "longitude": 148.1167617
+    "longitude": 148.1167617,
+    "passes": 486,
+    "failures": 357,
+    "pass_rate": 57.65124555160143
   },
   {
     "id": 129,
     "name": "Wallsend",
     "latitude": -32.9031005,
-    "longitude": 151.6696167
+    "longitude": 151.6696167,
+    "passes": 2415,
+    "failures": 1621,
+    "pass_rate": 59.8364717542121
   },
   {
     "id": 130,
     "name": "Warners Bay",
     "latitude": -32.9745721,
-    "longitude": 151.6476831
+    "longitude": 151.6476831,
+    "passes": 2836,
+    "failures": 1942,
+    "pass_rate": 59.35537881958979
   },
   {
     "id": 126,
     "name": "Warrawong",
     "latitude": -34.4846129,
-    "longitude": 150.8804891
+    "longitude": 150.8804891,
+    "passes": 6608,
+    "failures": 5252,
+    "pass_rate": 55.71669477234401
   },
   {
     "id": 131,
     "name": "Warriewood",
     "latitude": -33.6923616,
-    "longitude": 151.3045344
+    "longitude": 151.3045344,
+    "passes": 10423,
+    "failures": 8081,
+    "pass_rate": 56.32836143536532
   },
   {
     "id": 132,
     "name": "Wauchope",
     "latitude": -31.4575902,
-    "longitude": 152.7307675
+    "longitude": 152.7307675,
+    "passes": 3218,
+    "failures": 1793,
+    "pass_rate": 64.21871881859909
   },
   {
     "id": 133,
     "name": "Wellington",
     "latitude": -32.5520391,
-    "longitude": 148.9492902
+    "longitude": 148.9492902,
+    "passes": 1034,
+    "failures": 847,
+    "pass_rate": 54.97076023391813
   },
   {
     "id": 134,
     "name": "Wentworth",
     "latitude": -34.10707470000001,
-    "longitude": 141.9177526
+    "longitude": 141.9177526,
+    "passes": 898,
+    "failures": 801,
+    "pass_rate": 52.85462036492055
   },
   {
     "id": 135,
     "name": "West Wyalong",
     "latitude": -33.9223568,
-    "longitude": 147.2026202
+    "longitude": 147.2026202,
+    "passes": 747,
+    "failures": 621,
+    "pass_rate": 54.60526315789473
   },
   {
     "id": 136,
     "name": "Wetherill Park",
     "latitude": -33.8493088,
-    "longitude": 150.8990342
+    "longitude": 150.8990342,
+    "passes": 15339,
+    "failures": 15301,
+    "pass_rate": 50.062010443864224
   },
   {
     "id": 141,
     "name": "Yass",
     "latitude": -34.8074687,
-    "longitude": 148.8826039
+    "longitude": 148.8826039,
+    "passes": 1602,
+    "failures": 1116,
+    "pass_rate": 58.94039735099338
   },
   {
     "id": 142,
     "name": "Young",
     "latitude": -34.3134008,
-    "longitude": 148.2979356
+    "longitude": 148.2979356,
+    "passes": 1557,
+    "failures": 1228,
+    "pass_rate": 55.90664272890484
   }
 ]

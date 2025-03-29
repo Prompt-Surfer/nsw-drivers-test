@@ -14,8 +14,14 @@ pub struct LocationBookingViewModel {
     pub earliest_slot: Option<TimeSlot>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BookingResponse {
+    pub bookings: Vec<LocationBookingViewModel>,
+    pub last_updated: Option<String>,
+}
+
 #[server(GetBookings)]
-pub async fn get_location_bookings() -> Result<Vec<LocationBookingViewModel>, ServerFnError> {
+pub async fn get_location_bookings() -> Result<BookingResponse, ServerFnError> {
     use crate::data::booking::BookingManager;
     
     let booking_data = BookingManager::get_data();
@@ -32,7 +38,10 @@ pub async fn get_location_bookings() -> Result<Vec<LocationBookingViewModel>, Se
         }
     }).collect();
     
-    Ok(view_models)
+    Ok(BookingResponse {
+        bookings: view_models,
+        last_updated: booking_data.last_updated.clone(),
+    })
 }
 
 #[component]
@@ -62,6 +71,7 @@ fn LocationsTable(
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Distance (km)</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Earliest Available Slot</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pass Rate</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-200">
@@ -93,6 +103,30 @@ fn LocationsTable(
                                             }
                                         }}
                                     </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {move || {
+                                            let pass_rate = loc.pass_rate;
+                                            let color_class = if pass_rate >= 90.0 {
+                                                "bg-green-500"
+                                            } else if pass_rate >= 80.0 {
+                                                "bg-green-400"
+                                            } else if pass_rate >= 70.0 {
+                                                "bg-green-300"
+                                            } else if pass_rate >= 60.0 {
+                                                "bg-green-200"
+                                            } else if pass_rate >= 50.0 {
+                                                "bg-green-100"
+                                            } else {
+                                                "bg-gray-100"
+                                            };
+                                            
+                                            view! {
+                                                <span class={format!("px-2 py-1 rounded-md text-gray-900 {}", color_class)}>
+                                                    {format!("{:.1}%", pass_rate)}
+                                                </span>
+                                            }
+                                        }}
+                                    </td>
                                 </tr>
                             }
                         }).collect::<Vec<_>>()
@@ -111,6 +145,8 @@ pub fn HomePage() -> impl IntoView {
     let (current_location_name, set_current_location_name) = create_signal("Sydney".to_string());
     let (geocoding_status, set_geocoding_status) = create_signal::<Option<String>>(None);
     let (is_loading, set_is_loading) = create_signal(false);
+
+    let (last_updated, set_last_updated) = create_signal::<Option<String>>(None);
     
     let (bookings, set_bookings) = create_signal(Vec::<LocationBookingViewModel>::new());
     let (is_fetching_bookings, set_is_fetching_bookings) = create_signal(false);
@@ -123,7 +159,8 @@ pub fn HomePage() -> impl IntoView {
         leptos::task::spawn_local(async move {
             match get_location_bookings().await {
                 Ok(data) => {
-                    set_bookings(data);
+                    set_bookings(data.bookings);
+                    set_last_updated(data.last_updated);
                 },
                 Err(err) => {
                     leptos::logging::log!("Error fetching bookings: {:?}", err);
@@ -186,14 +223,6 @@ pub fn HomePage() -> impl IntoView {
         <div class="max-w-4xl mx-auto p-4">
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-2xl font-bold text-gray-800">NSW Available Drivers Tests</h2>
-                <a 
-                    href="https://github.com/teehee567/nsw-drivers-test"
-                    target="_blank"
-                    class="px-3 py-1.5 bg-gray-800 text-white rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors flex items-center gap-2"
-                >
-                    <i class="fab fa-github w-5 h-5"></i>
-                    <span>View on GitHub</span>
-                </a>
             </div>
             
             <div class="mb-6">
@@ -218,13 +247,22 @@ pub fn HomePage() -> impl IntoView {
                         <p class="mt-1 text-xs text-gray-500 italic">Your search data is processed locally and not sent to our servers.</p>
                     </div>
                 </div>
-                    
-                <button 
-                    class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
-                    on:click=move |_| handle_geocode(())
-                >
-                    Search
-                </button>
+
+                <div class="flex items-center gap-4 mt-2 w-full">
+                    <button 
+                        class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+                        on:click=move |_| handle_geocode(())
+                    >
+                        Search
+                    </button>
+
+                    <div class="ml-auto text-sm text-gray-500">
+                        {move || match last_updated.get() {
+                            Some(time) => format!("Last updated from NSW: {}", time),
+                            None => "Last updated from NSW: unknown".to_string(),
+                        }}
+                    </div>
+                </div>
                 
                 <div class="mt-2">
                     {move || {
@@ -256,6 +294,8 @@ pub fn HomePage() -> impl IntoView {
                         </div>
                     </div>
                 </div>
+
+                <p class="mt-1 text-xs text-gray-500 italic">"Disclaimer: Pass rates shown are calculated based on the customer's local government area (LGA) and weighted according to proximity to nearby testing centers. These rates are estimates only. Data is from 2022-2025 C Class Driver tests"</p>
             </div>
             
             <LocationsTable 
@@ -268,16 +308,21 @@ pub fn HomePage() -> impl IntoView {
             
             <div class="mt-6 flex justify-between items-center">
                 <div class="text-sm text-gray-500">
+                    <p>Location search results are made using "https://nominatim.org/" and are always done on your browser, your location information never touches our servers</p>
                     <p>Note: Distances are calculated using the Haversine formula and represent "as the crow flies" distance.</p>
+                    <p>You can support me by giving me a github star</p>
                 </div>
                 
-                <button 
-                    class="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-300 transition-colors flex items-center gap-1"
-                    on:click=move |_| fetch_bookings()
-                    disabled=is_fetching_bookings
-                >
-                    <span>{move || if is_fetching_bookings.get() { "Refreshing..." } else { "Refresh" }}</span>
-                </button>
+                <div class="flex gap-2">
+                    <a 
+                        href="https://github.com/teehee567/nsw-drivers-test"
+                        target="_blank"
+                        class="px-3 py-1.5 bg-gray-800 text-white rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors inline-flex items-center justify-center gap-2"
+                    >
+                        <i class="fab fa-github"></i>
+                        <span>View on GitHub</span>
+                    </a>
+                </div>
             </div>
         </div>
     }

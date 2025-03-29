@@ -82,6 +82,9 @@ pub struct Location {
     pub name: String,
     pub latitude: f64,
     pub longitude: f64,
+    pub passes: i32,
+    pub failures: i32,
+    pub pass_rate: f64,
 }
 
 impl Location {
