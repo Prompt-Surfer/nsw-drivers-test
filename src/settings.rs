@@ -10,10 +10,10 @@ pub struct Settings {
     pub headless: bool,
     pub username: String,
     pub password: String,
-    pub wait_timer: u64,
-    pub wait_timer_car: u64,
     pub have_booking: bool,
     pub selenium_driver_url: String,
+    pub selenium_element_timout: u64,
+    pub selenium_element_polling: u64,
 }
 
 impl Settings {

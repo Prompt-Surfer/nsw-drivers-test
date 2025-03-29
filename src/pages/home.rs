@@ -3,6 +3,7 @@ use std::time::Duration;
 
 use leptos::prelude::*;
 use leptos::server_fn::error::NoCustomError;
+use reqwest::header;
 use serde::{Deserialize, Serialize};
 
 use crate::data::location::LocationManager;
@@ -20,20 +21,32 @@ pub struct LocationBookingViewModel {
 pub struct BookingResponse {
     pub bookings: Vec<LocationBookingViewModel>,
     pub last_updated: Option<String>,
+    pub etag: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LocationDetailBookingResponse {
     pub location: String,
     pub slots: Vec<TimeSlot>,
+    pub etag: String,
 }
 
+
 #[server(GetBookings)]
-pub async fn get_location_bookings() -> Result<BookingResponse, ServerFnError> {
+pub async fn get_location_bookings(client_etag: String) -> Result<Option<BookingResponse>, ServerFnError> {
     use crate::data::booking::BookingManager;
+    use axum::http::StatusCode;
+    use axum::http::HeaderValue;
     
-    let booking_data = BookingManager::get_data();
-    
+    let response = expect_context::<leptos_axum::ResponseOptions>();
+
+    let (booking_data, server_etag) = BookingManager::get_data();
+    if client_etag == server_etag {
+        // WARN: for some reason this makes it open in hte browser
+        // response.set_status(StatusCode::NOT_MODIFIED);
+        return Ok(None)
+    }
+
     let view_models: Vec<_> = booking_data.results.iter().map(|location_booking| {
         let earliest_slot = location_booking.slots.iter()
             .filter(|slot| slot.availability)
@@ -45,27 +58,32 @@ pub async fn get_location_bookings() -> Result<BookingResponse, ServerFnError> {
             earliest_slot
         }
     }).collect();
-    
-    Ok(BookingResponse {
+
+    Ok(Some(BookingResponse {
         bookings: view_models,
         last_updated: booking_data.last_updated.clone(),
-    })
+        etag: server_etag,
+    }))
 }
 
 #[server(GetLocationDetails)]
-pub async fn get_location_details(location_id: String) -> Result<LocationDetailBookingResponse, ServerFnError> {
+pub async fn get_location_details(location_id: String, client_etag: String) -> Result<Option<LocationDetailBookingResponse>, ServerFnError> {
     use crate::data::booking::BookingManager;
     
-    let booking_data = BookingManager::get_data();
-    
-    let location_booking = booking_data.results.iter()
-        .find(|booking| booking.location == location_id)
+    let (location_booking, server_etag) = BookingManager::get_location_data(location_id)
         .ok_or(ServerFnError::<NoCustomError>::ServerError("Location not found".into()))?;
+
+    if client_etag == server_etag {
+        // WARN: for some reason this makes it open in hte browser
+        // response.set_status(StatusCode::NOT_MODIFIED);
+        return Ok(None)
+    }
     
-    Ok(LocationDetailBookingResponse {
-        location: location_booking.location.clone(),
-        slots: location_booking.slots.clone(),
-    })
+    Ok(Some(LocationDetailBookingResponse {
+        location: location_booking.location,
+        slots: location_booking.slots,
+        etag: server_etag,
+    }))
 }
 
 #[component]
@@ -76,6 +94,8 @@ fn ExpandedLocationDetails(
     let (slots, set_slots) = create_signal(Vec::<TimeSlot>::new());
     let (is_loading, set_is_loading) = create_signal(false);
     let (error, set_error) = create_signal::<Option<String>>(None);
+
+    let (location_etag, set_location_etag) = create_signal(String::new());
     
     let slots_by_date = create_memo(move |_| {
         let mut grouped: HashMap<String, Vec<TimeSlot>> = HashMap::new();
@@ -123,9 +143,15 @@ fn ExpandedLocationDetails(
             set_error(None);
             
             leptos::task::spawn_local(async move {
-                match get_location_details(location_id_clone).await {
+                match get_location_details(location_id_clone, location_etag.get_untracked()).await {
                     Ok(response) => {
-                        set_slots(response.slots);
+                        match response {
+                            Some(response) => {
+                                set_slots(response.slots);
+                                set_location_etag(response.etag);
+                            },
+                            None => {}
+                        }
                     },
                     Err(err) => {
                         set_error(Some(format!("Error loading details: {}", err)));
@@ -223,7 +249,7 @@ fn LocationRow(
                             <span class="text-green-600 font-medium">{slot.start_time}</span>
                         }.into_any(),
                         None => {
-                            if is_loading.get() {
+                            if is_loading.get_untracked() {
                                 view! { <span class="text-gray-400">Loading...</span> }.into_any()
                             } else {
                                 view! { <span class="text-gray-400">No availability</span> }.into_any()
@@ -354,6 +380,8 @@ pub fn HomePage() -> impl IntoView {
     
     let (bookings, set_bookings) = create_signal(Vec::<LocationBookingViewModel>::new());
     let (is_fetching_bookings, set_is_fetching_bookings) = create_signal(false);
+
+    let (booking_etag, set_booking_etag) = create_signal(String::new());
     
     let location_manager = LocationManager::new();
     
@@ -361,10 +389,17 @@ pub fn HomePage() -> impl IntoView {
         set_is_fetching_bookings(true);
         
         leptos::task::spawn_local(async move {
-            match get_location_bookings().await {
+            match get_location_bookings(booking_etag.get_untracked()).await {
                 Ok(data) => {
-                    set_bookings(data.bookings);
-                    set_last_updated(data.last_updated);
+                    match data {
+                        Some(data) => {
+                            set_bookings(data.bookings);
+                            set_last_updated(data.last_updated);
+                            set_booking_etag(data.etag);
+                        },
+                        None => {
+                        }
+                    };
                 },
                 Err(err) => {
                     leptos::logging::log!("Error fetching bookings: {:?}", err);

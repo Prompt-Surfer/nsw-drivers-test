@@ -28,8 +28,8 @@ pub async fn scrape_rta_timeslots(
     
     let driver = WebDriver::new(settings.selenium_driver_url.clone(), caps).await?;
     
-    let timeout = Duration::from_secs(20);
-    let polling = Duration::from_millis(100);
+    let timeout = Duration::from_millis(settings.selenium_element_timout);
+    let polling = Duration::from_millis(settings.selenium_element_polling);
     
     driver.execute(
         "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})",
@@ -69,51 +69,36 @@ pub async fn scrape_rta_timeslots(
             car_option.wait_until().wait(timeout, polling).displayed().await?;
             car_option.click().await?;
             
-            sleep(Duration::from_secs(settings.wait_timer_car));
-            
             let test_item = driver.query(By::XPath("//fieldset[@id='DC']/span[contains(@class, 'rms_testItemResult')]")).first().await?;
             test_item.wait_until().wait(timeout, polling).displayed().await?;
             test_item.click().await?;
             
-            sleep(Duration::from_secs(settings.wait_timer));
-            
             let next_button = driver.query(By::Id("nextButton")).first().await?;
             next_button.wait_until().wait(timeout, polling).displayed().await?;
             next_button.click().await?;
-            
-            sleep(Duration::from_secs(settings.wait_timer));
             
             let check_terms = driver.query(By::Id("checkTerms")).first().await?;
             check_terms.wait_until().wait(timeout, polling).displayed().await?;
             check_terms.click().await?;
             
-            sleep(Duration::from_secs(settings.wait_timer));
-            
             let next_button = driver.query(By::Id("nextButton")).first().await?;
             next_button.wait_until().wait(timeout, polling).displayed().await?;
             next_button.click().await?;
-            
-            sleep(Duration::from_secs(settings.wait_timer));
             
             let location_select = driver.query(By::Id("rms_batLocLocSel")).first().await?;
             location_select.wait_until().wait(timeout, polling).displayed().await?;
             location_select.click().await?;
             
-            sleep(Duration::from_secs(settings.wait_timer));
         }
         
         let location_select = driver.query(By::Id("rms_batLocLocSel")).first().await?;
         location_select.wait_until().wait(timeout, polling).displayed().await?;
         location_select.click().await?;
         
-        sleep(Duration::from_secs(settings.wait_timer));
-        
         let select_element = driver.query(By::Id("rms_batLocationSelect2")).first().await?;
         select_element.wait_until().wait(timeout, polling).displayed().await?;
         let select_box = SelectElement::new(&select_element).await?;
         select_box.select_by_value(location).await?;
-        
-        sleep(Duration::from_secs(settings.wait_timer));
         
         let next_button = driver.query(By::Id("nextButton")).first().await?;
         next_button.wait_until().wait(timeout, polling).displayed().await?;
