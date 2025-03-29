@@ -12,7 +12,7 @@ fn get_location_store() -> &'static Arc<RwLock<LocationStore>> {
 
 fn initialize_location_store() {
     fn parse_locations() -> Vec<Location> {
-        let json_data = include_str!("../../data/centers.json");
+        let json_data = include_str!("../../data/centres.json");
         serde_json::from_str(json_data).unwrap_or_else(|e| {
             log::error!("Failed to parse locations: {}", e);
             Vec::new()

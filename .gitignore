@@ -12,6 +12,8 @@ playwright/.cache/
 
 data/bookings.json
 
+temp/
+
 **/.env
 
 .DS_Store

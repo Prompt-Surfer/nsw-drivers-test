@@ -14,7 +14,7 @@ use serde::Deserialize;
 // FIX: HACKY
 fn get_location_names() -> Vec<String> {
     fn parse_locations() -> Vec<Location> {
-        let mut file = File::open("data/centers.json").unwrap();
+        let mut file = File::open("data/centres.json").unwrap();
         let mut contents = String::new();
         file.read_to_string(&mut contents).unwrap();
         serde_json::from_str(&contents).unwrap_or_else(|e| {

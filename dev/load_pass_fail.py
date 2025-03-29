@@ -10,7 +10,7 @@ from typing import Dict, List, Set, Optional, Tuple
 from pathlib import Path
 
 GEOCODING_CACHE: Dict[str, Dict] = {}
-CACHE_FILE = "geocoding_cache.json"
+CACHE_FILE = "dev/geocoding_cache.json"
 
 def load_cache():
     global GEOCODING_CACHE

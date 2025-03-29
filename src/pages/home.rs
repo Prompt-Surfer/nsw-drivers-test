@@ -236,6 +236,9 @@ fn LocationRow(
         set_expanded.update(|val| *val = !*val);
     };
 
+    let total_tests = loc.passes + loc.failures;
+    let low_data = total_tests < 1000;
+
     view! {
         <>
             <tr class="hover:bg-gray-50 transition-colors cursor-pointer" on:click=toggle_expand>
@@ -260,24 +263,62 @@ fn LocationRow(
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {move || {
                         let pass_rate = loc.pass_rate;
-                        let color_class = if pass_rate >= 90.0 {
-                            "bg-green-500"
-                        } else if pass_rate >= 80.0 {
-                            "bg-green-400"
-                        } else if pass_rate >= 70.0 {
-                            "bg-green-300"
-                        } else if pass_rate >= 60.0 {
-                            "bg-green-200"
-                        } else if pass_rate >= 50.0 {
-                            "bg-green-100"
+                        let color_class = if low_data {
+                            "bg-yellow-500"
                         } else {
-                            "bg-gray-100"
+                            if pass_rate >= 90.0 {
+                                "bg-green-500"
+                            } else if pass_rate >= 80.0 {
+                                "bg-green-400"
+                            } else if pass_rate >= 70.0 {
+                                "bg-green-300"
+                            } else if pass_rate >= 60.0 {
+                                "bg-green-200"
+                            } else if pass_rate >= 50.0 {
+                                "bg-green-100"
+                            } else {
+                                "bg-gray-100"
+                            }
                         };
                         
                         view! {
-                            <span class={format!("px-2 py-1 rounded-md text-gray-900 {}", color_class)}>
-                                {format!("{:.1}%", pass_rate)}
-                            </span>
+                            <div class="flex items-center gap-1">
+                                <span class={format!("px-2 py-1 rounded-md text-gray-900 {}", color_class)}>
+                                    {format!("{:.1}%", pass_rate)}
+                                </span>
+                                
+                                {if low_data {
+                                    let (tooltip_visible, set_tooltip_visible) = create_signal(false);
+                                    
+                                    let toggle_tooltip = move |_| {
+                                        set_tooltip_visible.update(|visible| *visible = !*visible);
+                                    };
+                                    
+                                    view! {
+                                        <div class="relative inline-block">
+                                            <span 
+                                                class="text-red-700 cursor-help" 
+                                                on:click=toggle_tooltip
+                                                on:mouseenter=move |_| set_tooltip_visible(true)
+                                                on:mouseleave=move |_| set_tooltip_visible(false)
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                                </svg>
+                                            </span>
+                                            <div 
+                                                class="absolute left-0 bottom-full mb-2 inline-block max-w-40 bg-gray-700 bg-opacity-90 text-white text-xs rounded py-1.5 px-2 z-10 shadow-md transition-opacity duration-150"
+                                                style:opacity={move || if tooltip_visible.get() { "1" } else { "0" }}
+                                                style:pointer-events={move || if tooltip_visible.get() { "auto" } else { "none" }}
+                                            >
+                                                Less than 1000 tests
+                                            </div>
+                                        </div>
+                                    }.into_any()
+                                } else {
+                                    view! { <span></span> }.into_any()
+                                }}
+                            </div>
                         }
                     }}
                 </td>
@@ -534,7 +575,13 @@ pub fn HomePage() -> impl IntoView {
                     </div>
                 </div>
 
-                <p class="mt-1 text-xs text-gray-500 italic">"Disclaimer: Pass rates shown are calculated based on the customer's local government area (LGA) and weighted according to proximity to nearby testing centers. These rates are estimates only. Data is from 2022-2025 C Class Driver tests"</p>
+                <p class="mt-1 text-xs text-gray-500 italic">
+                  "Disclaimer: Pass rates shown are calculated based on the "
+                  <span class="text-amber-600">center</span> " of the customer's local government 
+                  area (LGA) and weighted according to proximity to nearby testing centers. "
+                  <span class="text-amber-600">These rates are estimates only.</span> 
+                  " Data is from 2022-2025 C Class Driver tests."
+                </p>
             </div>
             
             <LocationsTable 
