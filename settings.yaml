@@ -4,4 +4,4 @@ password: "${PASSWORD}"
 wait_timer: 2
 wait_timer_car: 15
 have_booking: true
-selenium_driver_url: "http://localhost:57908"
+selenium_driver_url: "http://localhost:51927"

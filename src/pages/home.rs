@@ -2,10 +2,12 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use leptos::prelude::*;
+use leptos::server_fn::error::NoCustomError;
 use serde::{Deserialize, Serialize};
 
 use crate::data::location::LocationManager;
 use crate::data::shared_booking::TimeSlot;
+use crate::utils::date::format_iso_date;
 use crate::utils::geocoding::geocode_address;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -18,6 +20,12 @@ pub struct LocationBookingViewModel {
 pub struct BookingResponse {
     pub bookings: Vec<LocationBookingViewModel>,
     pub last_updated: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LocationDetailBookingResponse {
+    pub location: String,
+    pub slots: Vec<TimeSlot>,
 }
 
 #[server(GetBookings)]
@@ -44,6 +52,232 @@ pub async fn get_location_bookings() -> Result<BookingResponse, ServerFnError> {
     })
 }
 
+#[server(GetLocationDetails)]
+pub async fn get_location_details(location_id: String) -> Result<LocationDetailBookingResponse, ServerFnError> {
+    use crate::data::booking::BookingManager;
+    
+    let booking_data = BookingManager::get_data();
+    
+    let location_booking = booking_data.results.iter()
+        .find(|booking| booking.location == location_id)
+        .ok_or(ServerFnError::<NoCustomError>::ServerError("Location not found".into()))?;
+    
+    Ok(LocationDetailBookingResponse {
+        location: location_booking.location.clone(),
+        slots: location_booking.slots.clone(),
+    })
+}
+
+#[component]
+fn ExpandedLocationDetails(
+    location_id: String,
+    expanded: ReadSignal<bool>
+) -> impl IntoView {
+    let (slots, set_slots) = create_signal(Vec::<TimeSlot>::new());
+    let (is_loading, set_is_loading) = create_signal(false);
+    let (error, set_error) = create_signal::<Option<String>>(None);
+    
+    let slots_by_date = create_memo(move |_| {
+        let mut grouped: HashMap<String, Vec<TimeSlot>> = HashMap::new();
+        
+        for slot in slots.get().iter() {
+            if slot.availability {
+                if let Some(date_part) = slot.start_time.split_whitespace().next() {
+                    let entry = grouped.entry(date_part.to_string())
+                        .or_insert_with(Vec::new);
+                    entry.push(slot.clone());
+                }
+            }
+        }
+        
+        let mut dates: Vec<_> = grouped.into_iter().collect();
+        dates.sort_by(|(date_a, _), (date_b, _)| {
+            let parts_a: Vec<&str> = date_a.split('/').collect();
+            let parts_b: Vec<&str> = date_b.split('/').collect();
+            
+            if parts_a.len() == 3 && parts_b.len() == 3 {
+                let year_compare = parts_a[2].cmp(parts_b[2]);
+                if year_compare != std::cmp::Ordering::Equal {
+                    return year_compare;
+                }
+                
+                let month_compare = parts_a[1].cmp(parts_b[1]);
+                if month_compare != std::cmp::Ordering::Equal {
+                    return month_compare;
+                }
+                
+                return parts_a[0].cmp(parts_b[0]);
+            }
+            
+            date_a.cmp(date_b)
+        });
+        
+        dates
+    });
+    
+    create_effect(move |_| {
+        if expanded.get() {
+            let location_id_clone = location_id.clone();
+            
+            set_is_loading(true);
+            set_error(None);
+            
+            leptos::task::spawn_local(async move {
+                match get_location_details(location_id_clone).await {
+                    Ok(response) => {
+                        set_slots(response.slots);
+                    },
+                    Err(err) => {
+                        set_error(Some(format!("Error loading details: {}", err)));
+                    }
+                }
+                set_is_loading(false);
+            });
+        }
+    });
+    
+    view! {
+        <Show when=move || expanded.get()>
+            <tr>
+                <td colspan="5" class="px-6 py-4 bg-gray-50">
+                    {move || {
+                        if is_loading.get() {
+                            view! {
+                                <div class="flex justify-center items-center py-4">
+                                    <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+                                </div>
+                            }.into_any()
+                        } else if let Some(err) = error.get() {
+                            view! {
+                                <div class="text-red-500 py-2">{err}</div>
+                            }.into_any()
+                        } else {
+                            let dates = slots_by_date.get();
+                            
+                            if dates.is_empty() {
+                                view! {
+                                    <div class="text-gray-500 py-2 text-center">No available slots</div>
+                                }.into_any()
+                            } else {
+                                view! {
+                                    <div class="max-h-80 overflow-y-auto">
+                                        <h3 class="text-lg font-medium mb-2">Available Times</h3>
+                                        <div class="space-y-4">
+                                            {dates.into_iter().map(|(date, slots)| {
+                                                view! {
+                                                    <div class="border-b border-gray-200 pb-2">
+                                                        <h4 class="font-medium text-gray-700 mb-1">{date}</h4>
+                                                        <div class="flex flex-wrap gap-2">
+                                                            {slots.into_iter().map(|slot| {
+                                                                let time_only = slot.start_time
+                                                                    .split_whitespace()
+                                                                    .nth(1)
+                                                                    .unwrap_or(&slot.start_time)
+                                                                    .to_string();
+                                                                
+                                                                view! {
+                                                                    <span class="inline-block bg-green-100 text-green-800 px-2 py-1 text-sm rounded">
+                                                                        {time_only}
+                                                                    </span>
+                                                                }
+                                                            }).collect::<Vec<_>>()}
+                                                        </div>
+                                                    </div>
+                                                }
+                                            }).collect::<Vec<_>>()}
+                                        </div>
+                                    </div>
+                                }.into_any()
+                            }
+                        }
+                    }}
+                </td>
+            </tr>
+        </Show>
+    }
+}
+
+#[component]
+fn LocationRow(
+    loc: crate::data::location::Location, 
+    distance: f64,
+    earliest_slot: Option<TimeSlot>,
+    is_loading: ReadSignal<bool>
+) -> impl IntoView {
+    let (expanded, set_expanded) = create_signal(false);
+    
+    let toggle_expand = move |_| {
+        set_expanded.update(|val| *val = !*val);
+    };
+
+    view! {
+        <>
+            <tr class="hover:bg-gray-50 transition-colors cursor-pointer" on:click=toggle_expand>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{loc.name}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {format!("{:.2}", distance)}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {match earliest_slot {
+                        Some(slot) => view! { 
+                            <span class="text-green-600 font-medium">{slot.start_time}</span>
+                        }.into_any(),
+                        None => {
+                            if is_loading.get() {
+                                view! { <span class="text-gray-400">Loading...</span> }.into_any()
+                            } else {
+                                view! { <span class="text-gray-400">No availability</span> }.into_any()
+                            }
+                        }
+                    }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {move || {
+                        let pass_rate = loc.pass_rate;
+                        let color_class = if pass_rate >= 90.0 {
+                            "bg-green-500"
+                        } else if pass_rate >= 80.0 {
+                            "bg-green-400"
+                        } else if pass_rate >= 70.0 {
+                            "bg-green-300"
+                        } else if pass_rate >= 60.0 {
+                            "bg-green-200"
+                        } else if pass_rate >= 50.0 {
+                            "bg-green-100"
+                        } else {
+                            "bg-gray-100"
+                        };
+                        
+                        view! {
+                            <span class={format!("px-2 py-1 rounded-md text-gray-900 {}", color_class)}>
+                                {format!("{:.1}%", pass_rate)}
+                            </span>
+                        }
+                    }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-center">
+                    <span class={move || {
+                        if expanded.get() {
+                            "transform rotate-180 inline-block transition-all duration-200 text-blue-600"
+                        } else {
+                            "inline-block transition-all duration-200 text-gray-500"
+                        }
+                    }}>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                        </svg>
+                    </span>
+                </td>
+            </tr>
+            
+            <ExpandedLocationDetails 
+                location_id=loc.id.to_string() 
+                expanded=expanded
+            />
+        </>
+    }
+}
+
 #[component]
 fn LocationsTable(
     bookings: ReadSignal<Vec<LocationBookingViewModel>>,
@@ -64,16 +298,24 @@ fn LocationsTable(
     });
 
     view! {
-        <div class="overflow-x-auto">
-            <table class="min-w-full bg-white border border-gray-200 rounded-lg overflow-hidden">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Distance (km)</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Earliest Available Slot</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pass Rate</th>
-                    </tr>
-                </thead>
+    <div class="overflow-x-auto">
+        <table class="min-w-full bg-white border border-gray-200 rounded-lg overflow-hidden table-fixed">
+            <colgroup>
+                <col style="width: 30%;" />
+                <col style="width: 20%;" />
+                <col style="width: 25%;" />
+                <col style="width: 20%;" />
+                <col style="width: 5%;" />
+            </colgroup>
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Distance (km)</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Earliest Available Slot</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pass Rate</th>
+                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Details</th>
+                </tr>
+            </thead>
                 <tbody class="divide-y divide-gray-200">
                     {move || {
                         let locations = sorted_locations.get();
@@ -84,50 +326,12 @@ fn LocationsTable(
                             let earliest_slot = booking_data.get(&location_id).cloned().flatten();
                             
                             view! {
-                                <tr class="hover:bg-gray-50 transition-colors">
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{loc.name}</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                        {format!("{:.2}", distance)}
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                        {match earliest_slot {
-                                            Some(slot) => view! { 
-                                                <span class="text-green-600 font-medium">{slot.start_time}</span>
-                                            }.into_any(),
-                                            None => {
-                                                if is_loading.get() {
-                                                    view! { <span class="text-gray-400">Loading...</span> }.into_any()
-                                                } else {
-                                                    view! { <span class="text-gray-400">No availability</span> }.into_any()
-                                                }
-                                            }
-                                        }}
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                        {move || {
-                                            let pass_rate = loc.pass_rate;
-                                            let color_class = if pass_rate >= 90.0 {
-                                                "bg-green-500"
-                                            } else if pass_rate >= 80.0 {
-                                                "bg-green-400"
-                                            } else if pass_rate >= 70.0 {
-                                                "bg-green-300"
-                                            } else if pass_rate >= 60.0 {
-                                                "bg-green-200"
-                                            } else if pass_rate >= 50.0 {
-                                                "bg-green-100"
-                                            } else {
-                                                "bg-gray-100"
-                                            };
-                                            
-                                            view! {
-                                                <span class={format!("px-2 py-1 rounded-md text-gray-900 {}", color_class)}>
-                                                    {format!("{:.1}%", pass_rate)}
-                                                </span>
-                                            }
-                                        }}
-                                    </td>
-                                </tr>
+                                <LocationRow
+                                    loc=loc
+                                    distance=distance
+                                    earliest_slot=earliest_slot
+                                    is_loading=is_loading
+                                />
                             }
                         }).collect::<Vec<_>>()
                     }}
@@ -258,8 +462,8 @@ pub fn HomePage() -> impl IntoView {
 
                     <div class="ml-auto text-sm text-gray-500">
                         {move || match last_updated.get() {
-                            Some(time) => format!("Last updated from NSW: {}", time),
-                            None => "Last updated from NSW: unknown".to_string(),
+                            Some(time) => format!("Data last updated: {}", format_iso_date(&time)),
+                            None => "Data last updated: unknown".to_string(),
                         }}
                     </div>
                 </div>

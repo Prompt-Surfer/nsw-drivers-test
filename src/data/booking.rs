@@ -100,7 +100,7 @@ impl BookingManager {
         let running_status = Arc::clone(get_background_status());
         
         tokio::spawn(async move {
-            let update_interval = Duration::from_secs(3600);
+            let update_interval = Duration::from_secs(6 * 3600);
             
             while *running_status.read().unwrap() {
                 BookingManager::perform_update(locations.clone(), &file_path, settings.clone()).await;
