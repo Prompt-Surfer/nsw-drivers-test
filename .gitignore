@@ -10,8 +10,6 @@ test-results/
 playwright-report/
 playwright/.cache/
 
-data/bookings.json
-
 temp/
 
 **/.env
