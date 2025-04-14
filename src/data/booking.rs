@@ -97,6 +97,21 @@ impl BookingManager {
         }).collect()
     }
 
+    pub fn update_date() {
+        let mut data_read_guard = get_booking_data().read().unwrap();
+
+        let data = BookingData {
+            results: data_read_guard.0.results.clone(),
+            last_updated: Some(chrono::Utc::now().to_rfc3339()),
+        };
+
+        let hash = data.calculate_hash();
+
+        let mut data_guard = get_booking_data().write().unwrap();
+        *data_guard = (data, hash);
+
+    }
+
     pub fn update_data(mut new_results: Vec<LocationBookings>) {
         new_results = Self::clean_data(new_results);
         let updated_data = BookingData {
@@ -125,8 +140,11 @@ impl BookingManager {
             let update_interval = Duration::from_secs(6 * 3600);
 
             while *running_status.read().unwrap() {
-                BookingManager::perform_update(locations.clone(), &file_path, settings.clone())
-                    .await;
+                // BookingManager::perform_update(locations.clone(), &file_path, settings.clone())
+                //     .await;
+                
+                BookingManager::update_date();
+
                 tokio::time::sleep(update_interval).await;
             }
         });
@@ -138,7 +156,7 @@ impl BookingManager {
     }
 
     pub async fn perform_update(locations: Vec<String>, file_path: &str, settings: Settings) {
-        const CHUNK_SIZE: usize = 10;
+        const CHUNK_SIZE: usize = 1;
         const MAX_RETRIES: usize = 3;
         const RETRY_DELAY: u64 = 5;
 
