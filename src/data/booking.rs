@@ -98,18 +98,20 @@ impl BookingManager {
     }
 
     pub fn update_date() {
-        let mut data_read_guard = get_booking_data().read().unwrap();
+        let (cloned_results, new_hash_data) = {
+            let data_read_guard = get_booking_data().read().unwrap();
 
-        let data = BookingData {
-            results: data_read_guard.0.results.clone(),
-            last_updated: Some(chrono::Utc::now().to_rfc3339()),
+            let new_data = BookingData {
+                results: data_read_guard.0.results.clone(),
+                last_updated: Some(chrono::Utc::now().to_rfc3339()),
+            };
+
+            let new_hash = new_data.calculate_hash();
+            (new_data, new_hash)
         };
 
-        let hash = data.calculate_hash();
-
         let mut data_guard = get_booking_data().write().unwrap();
-        *data_guard = (data, hash);
-
+        *data_guard = (cloned_results, new_hash_data);
     }
 
     pub fn update_data(mut new_results: Vec<LocationBookings>) {
