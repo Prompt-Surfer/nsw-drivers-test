@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
+use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
 use std::hash::{DefaultHasher, Hasher};
 use std::path::Path;
@@ -142,10 +143,8 @@ impl BookingManager {
             let update_interval = Duration::from_secs(6 * 3600);
 
             while *running_status.read().unwrap() {
-                // BookingManager::perform_update(locations.clone(), &file_path, settings.clone())
-                //     .await;
-                
-                BookingManager::update_date();
+                BookingManager::perform_update(locations.clone(), &file_path, settings.clone())
+                    .await;
 
                 tokio::time::sleep(update_interval).await;
             }
@@ -158,93 +157,103 @@ impl BookingManager {
     }
 
     pub async fn perform_update(locations: Vec<String>, file_path: &str, settings: Settings) {
-        const CHUNK_SIZE: usize = 1;
-        const MAX_RETRIES: usize = 3;
-        const RETRY_DELAY: u64 = 5;
+        let max_retries = settings.retries;
 
-        let mut all_results = Vec::new();
+        if locations.is_empty() {
+            return;
+        }
 
-        for locations_chunk in locations.chunks(CHUNK_SIZE) {
-            let locations_in_chunk: Vec<String> = locations_chunk.iter().cloned().collect();
-            let mut tasks = Vec::new();
+        let mut final_results: Option<HashMap<String, LocationBookings>> = None;
 
-            for location in &locations_in_chunk {
-                let location = location.clone();
-                let settings = settings.clone();
+        for attempt in 1..=max_retries {
+            println!("INFO: Scraping attempt {}/{}...", attempt, max_retries);
+            match super::rta::scrape_rta_timeslots(locations.clone(), &settings).await // Pass Vec<&str>
+            {
+                Ok(result_map) => {
+                    println!(
+                        "INFO: Successfully scraped {} locations in attempt {}.",
+                        result_map.len(), attempt
+                    );
+                    let owned_result_map: HashMap<String, LocationBookings> = result_map
+                        .into_iter()
+                        .map(|(k, v)| (k.to_string(), v))
+                        .collect();
+                    final_results = Some(owned_result_map);
+                    break;
+                }
+                Err(e) => {
+                    eprintln!(
+                        "ERROR: Scraping failed on attempt {}/{}: {:?}",
+                        attempt, max_retries, e
+                    );
+                    if attempt == max_retries {
+                        eprintln!(
+                            "ERROR: Failed to scrape locations after {} attempts. No data will be updated.",
+                             max_retries
+                        );
+                        return;
+                    }
+                    tokio::time::sleep(Duration::from_secs(5)).await;
+                }
+            }
+        }
 
-                tasks.push(tokio::spawn(async move {
-                    Self::scrape_location_with_retries(
-                        &location,
-                        settings.clone(),
-                        MAX_RETRIES,
-                        RETRY_DELAY,
-                    )
-                    .await
-                }));
+        if let Some(result_map) = final_results {
+            let all_results: Vec<LocationBookings> = result_map.into_values().collect();
+            Self::update_data(all_results);
+
+        }
+
+        if let Err(e) = Self::save_to_file(file_path) {
+            eprintln!("ERROR: Failed to save booking data to file '{}': {}", file_path, e);
+        } else {
+             println!("INFO: Update process complete. Data saved to '{}'.", file_path);
+        }
+    }
+
+    pub async fn perform_updates(initial_locations: Vec<String>, file_path: &str, settings: Settings) {
+        let max_retries = settings.retries;
+
+        let mut remaining_locations: HashSet<String> = initial_locations.into_iter().collect();
+        let mut successful_results: HashMap<String, LocationBookings> = HashMap::new();
+
+        for attempt in 1..=max_retries {
+            if remaining_locations.is_empty() {
+                break;
             }
 
-            for task in tasks {
-                match task.await {
-                    Ok((location, result)) => match result {
-                        Ok(booking_data) => {
-                            all_results.push(booking_data);
+            let current_batch: Vec<String> = remaining_locations.iter().cloned().collect();
+
+            match super::rta::scrape_rta_timeslots(current_batch, &settings).await {
+                Ok(partial_result_map) => {
+                    let received_count = partial_result_map.len();
+
+                    for (location_str, booking_data) in partial_result_map {
+                        if remaining_locations.remove(&location_str) {
+                             successful_results.insert(location_str.clone(), booking_data);
                         }
-                        Err(e) => {
-                            eprintln!(
-                                "Failed to scrape location {} after all retries: {}",
-                                location, e
-                            );
-                        }
-                    },
-                    Err(e) => {
-                        eprintln!("Task panicked: {:?}", e);
                     }
+
+                }
+                Err(e) => {
+                    eprintln!(
+                        "Scraping failed entirely on attempt {}/{}: {:?}",
+                        attempt, max_retries, e
+                    );
                 }
             }
 
-            tokio::time::sleep(Duration::from_millis(500)).await;
+            if !remaining_locations.is_empty() && attempt < max_retries {
+                tokio::time::sleep(Duration::from_secs(5)).await;
+            }
         }
 
-        if !all_results.is_empty() {
-            Self::update_data(all_results);
+        if !successful_results.is_empty() {
+            Self::update_data(successful_results.into_values().collect());
             if let Err(e) = Self::save_to_file(file_path) {
                 eprintln!("Failed to save booking data to file: {}", e);
             }
         }
     }
 
-    async fn scrape_location_with_retries(
-        location: &str,
-        settings: Settings,
-        max_retries: usize,
-        retry_delay: u64,
-    ) -> (String, Result<LocationBookings, String>) {
-        let location_str = location.to_string();
-
-        for attempt in 1..=max_retries {
-            match super::rta::scrape_rta_timeslots(location, &settings).await {
-                Ok(result) => return (location_str, Ok(result)),
-                Err(e) => {
-                    if attempt == max_retries {
-                        return (
-                            location_str,
-                            Err(format!("Failed after {} attempts: {:?}", max_retries, e)),
-                        );
-                    }
-
-                    eprintln!(
-                        "Error scraping location {} (attempt {}/{}): {:?}",
-                        location, attempt, max_retries, e
-                    );
-
-                    tokio::time::sleep(Duration::from_secs(retry_delay)).await;
-                }
-            }
-        }
-
-        (
-            location_str,
-            Err("Unexpected error in retry logic".to_string()),
-        )
-    }
 }

@@ -1,24 +1,120 @@
 use std::collections::HashMap;
-use std::fs::OpenOptions;
-use std::io::Write;
-use std::thread::sleep;
 use std::time::Duration;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
 use thirtyfour::components::SelectElement;
 use thirtyfour::{By, DesiredCapabilities, WebDriver};
 use thirtyfour::prelude::*;
 
-use crate::settings::Settings;
+use std::env;
+use std::fs::File;
+use std::io::Read;
+use std::path::Path;
 
-use super::shared_booking::{LocationBookings, TimeSlot};
+#[derive(Deserialize, Clone)]
+pub struct Settings {
+    pub headless: bool,
+    pub username: String,
+    pub password: String,
+    pub have_booking: bool,
+    pub selenium_driver_url: String,
+    pub selenium_element_timout: u64,
+    pub selenium_element_polling: u64,
+}
 
-pub async fn scrape_rta_timeslots(
-    locations: Vec<String>,
+impl Settings {
+    pub fn from_yaml<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
+        dotenv::from_path("../../.env").ok();
+        
+        let mut file = File::open(path)?;
+        let mut contents = String::new();
+        file.read_to_string(&mut contents)?;
+        
+        let mut settings: Settings = serde_yaml::from_str(&contents)?;
+        
+        settings.username = parse_env_var(&settings.username)?;
+        settings.password = parse_env_var(&settings.password)?;
+        
+        Ok(settings)
+    }
+}
+
+fn parse_env_var(value: &str) -> Result<String, Box<dyn std::error::Error>> {
+    if value.starts_with("${") && value.ends_with("}") {
+        let env_name = &value[2..value.len() - 1];
+        match env::var(env_name) {
+            Ok(val) => Ok(val),
+            Err(_) => Err(format!("Environment variable '{}' not found", env_name).into()),
+        }
+    } else {
+        Ok(value.to_string())
+    }
+}
+
+use std::{cmp::Ordering, hash::{DefaultHasher, Hash, Hasher}};
+
+#[derive(Debug, Clone, Serialize, Deserialize, Hash)]
+pub struct TimeSlot {
+    pub availability: bool,
+    pub slot_number: Option<u32>,
+    #[serde(rename = "startTime")]
+    pub start_time: String,
+}
+
+impl PartialEq for TimeSlot {
+    fn eq(&self, other: &Self) -> bool {
+        self.start_time == other.start_time
+    }
+}
+
+impl Eq for TimeSlot {}
+
+impl PartialOrd for TimeSlot {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for TimeSlot {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.start_time.cmp(&other.start_time)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Hash)]
+pub struct LocationBookings {
+    pub location: String,
+    pub slots: Vec<TimeSlot>,
+    pub next_available_date: Option<String>,
+}
+
+impl LocationBookings {
+    pub fn calculate_hash(&self) -> String {
+        let mut hasher = DefaultHasher::new();
+        self.hash(&mut hasher);
+        hasher.finish().to_string()
+    }
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, Hash)]
+pub struct BookingData {
+    pub results: Vec<LocationBookings>,
+    pub last_updated: Option<String>,
+}
+
+impl BookingData {
+    pub fn calculate_hash(&self) -> String {
+        let mut hasher = DefaultHasher::new();
+        self.hash(&mut hasher);
+        hasher.finish().to_string()
+    }
+}
+
+pub async fn scrape_rta_timeslots<'a>(
+    locations: Vec<&'a str>,
     settings: &Settings
-) -> WebDriverResult<HashMap<String, LocationBookings>> {
+) -> WebDriverResult<HashMap<&'a str, LocationBookings>> {
 
-    let mut location_bookings: HashMap<String, LocationBookings> = HashMap::new();
+    let mut location_bookings: HashMap<&'a str, LocationBookings> = HashMap::new();
 
     let mut caps = DesiredCapabilities::chrome();
     if settings.headless {
@@ -84,7 +180,8 @@ pub async fn scrape_rta_timeslots(
 
     }
 
-    for location in locations {
+    for location in locations.iter() {
+
         let process_result: WebDriverResult<LocationBookings> = async {
 
             tokio::time::sleep(Duration::from_secs(1)).await;
@@ -97,7 +194,10 @@ pub async fn scrape_rta_timeslots(
             select_element.wait_until().wait(timeout, polling).displayed().await?;
             let select_box = SelectElement::new(&select_element).await?;
 
-            if let Err(e) = select_box.select_by_value(&location).await {
+            // FIX: might not need htis
+            let location_value = format!("{} Service NSW Centre", location);
+
+            if let Err(e) = select_box.select_by_value(&location_value).await {
                  eprintln!("ERROR: Failed to select location '{}' in dropdown: {}. Ensure the value is correct.", location, e);
                  return Err(e);
             }
@@ -170,7 +270,7 @@ pub async fn scrape_rta_timeslots(
 
         match process_result {
             Ok(booking_data) => {
-                location_bookings.insert(location, booking_data);
+                location_bookings.insert(*location, booking_data);
             }
             Err(e) => {
                  match driver.query(By::Id("anotherLocationLink")).first().await {
@@ -197,4 +297,30 @@ pub async fn scrape_rta_timeslots(
     driver.quit().await?;
 
     Ok(location_bookings)
+}
+
+
+#[tokio::main]
+async fn main() {
+    let mut settings = Settings::from_yaml("../../settings.yaml").unwrap();
+    settings.headless = false;
+    let env_content = include_str!("../../../.env");
+
+    let (username, password) = env_content
+        .lines()
+        .filter_map(|line| line.split_once('='))
+        .map(|(key, value)| (key.trim(), value.trim()))
+        .fold((None, None), |(mut u, mut p), (k, v)| {
+            if k == "USERNAME" { u = Some(v.to_string()); }
+            if k == "PASSWORD" { p = Some(v.to_string()); }
+            (u, p)
+        });
+
+    settings.username = username.unwrap();
+    settings.password = password.unwrap();
+    
+    let locations = vec!["Finley", "Hornsby", "Armidale", "Auburn", "Ballina"];
+    
+    dbg!(scrape_rta_timeslots(locations, &settings).await);
+
 }
