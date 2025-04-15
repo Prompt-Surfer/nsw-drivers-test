@@ -249,7 +249,7 @@ fn LocationRow(
 
     view! {
         <>
-            <tr class="hover:bg-gray-50 group transition-colors cursor-pointer border-l-4 border-transparent hover:border-blue-300 relative"
+            <tr class="hover:bg-gray-50 group transition-colors cursor-pointer relative"
                 on:click=toggle_expand>
 
                 <td class="px-2 py-3 md:px-4 md:py-3 whitespace-nowrap text-sm font-medium text-gray-900 truncate">
