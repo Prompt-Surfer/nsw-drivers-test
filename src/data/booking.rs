@@ -64,6 +64,7 @@ impl BookingManager {
 
     pub fn init_from_file(file_path: &str) -> Result<(), String> {
         if !Path::new(file_path).exists() {
+            println!("No path for booking data");
             return Ok(());
         }
 
