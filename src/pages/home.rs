@@ -5,6 +5,7 @@ use leptos::prelude::*;
 use leptos::server_fn::error::NoCustomError;
 use reqwest::header;
 use serde::{Deserialize, Serialize};
+use web_sys::wasm_bindgen::prelude::Closure;
 
 use crate::data::location::LocationManager;
 use crate::data::shared_booking::TimeSlot;
@@ -472,7 +473,7 @@ pub fn HomePage() -> impl IntoView {
         
         || {}
     });
-    
+
     let handle_geocode = move |_| {
         let address = address_input.get();
         if address.is_empty() {
@@ -499,6 +500,35 @@ pub fn HomePage() -> impl IntoView {
             }
         });
     };
+
+    use leptos::wasm_bindgen::JsCast;
+    use web_sys::Geolocation;
+
+    #[cfg(not(feature = "ssr"))]
+    {
+        create_effect(move |_| {
+            if let Some(window) = web_sys::window() {
+                if let Ok(geolocation) = window.navigator().geolocation() {
+                    let success_callback = Closure::<dyn FnMut(web_sys::Position)>::new(move |position: web_sys::Position| {
+                        set_latitude(position.coords().latitude());
+                        set_longitude(position.coords().longitude());
+                        set_address_input(format!(
+                            "{}, {}",
+                            position.coords().latitude(),
+                            position.coords().longitude()
+                        ));
+                        handle_geocode(());
+                    });
+
+                    let _ = geolocation.get_current_position(
+                        success_callback.as_ref().unchecked_ref(),
+                    );
+
+                    success_callback.forget();
+                }
+            }
+        });
+    }
 
     view! {
         <div class="max-w-4xl mx-auto p-4">
