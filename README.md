@@ -2,12 +2,11 @@
 
 A modern, efficient tool for checking driving test availability across Service NSW centers.
 
+![Home Page](dev/images/homepage.png)
 
 ## Overview
 
 NSW Drivers Test is a web application that helps learner drivers find the earliest available driving test appointments across all Service NSW locations. Instead of manually checking each location, this tool aggregates availability data and sorts locations by distance from your chosen address/location.
-
-Originally based on the scraping script from [sbmkvp](https://github.com/sbmkvp/rta_booking_information), made because that repo seems to be dead since 7/3/25 and their release goals for new features haven't been met
 
 ## Technologies Used
 
@@ -67,3 +66,6 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## License
 
 This project is licensed under the GPL3 License - see the LICENSE file for details.
+
+## References
+[sbmkvp](https://github.com/sbmkvp/rta_booking_information)
