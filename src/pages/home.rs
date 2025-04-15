@@ -367,24 +367,24 @@ fn LocationsTable(
     });
 
     view! {
-    <div class="overflow-x-auto">
-        <table class="min-w-full bg-white border border-gray-200 rounded-lg overflow-hidden table-fixed">
-            <colgroup>
-                <col style="width: 30%;" />
-                <col style="width: 20%;" />
-                <col style="width: 25%;" />
-                <col style="width: 20%;" />
-                <col style="width: 5%;" />
-            </colgroup>
-            <thead class="bg-gray-50">
-                <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Distance (km)</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Earliest Available Slot</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pass Rate</th>
-                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Details</th>
-                </tr>
-            </thead>
+        <div class="overflow-x-auto">
+            <table class="min-w-full bg-white border border-gray-200 rounded-lg overflow-hidden table-fixed">
+                <colgroup>
+                    <col style="width: 20%;" />
+                    <col style="width: 15%;" />
+                    <col style="width: 20%;" />
+                    <col style="width: 15%;" />
+                    <col style="width: 5%;" />
+                </colgroup>
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-3 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                        <th class="px-2 py-2 md:px-4 md:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Distance</th>
+                        <th class="px-2 py-2 md:px-4 md:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Earliest Slot</th>
+                        <th class="px-2 py-2 md:px-4 md:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pass Rate</th>
+                        <th class="px-1 py-2 md:px-2 md:py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Details</th>
+                    </tr>
+                </thead>
                 <tbody class="divide-y divide-gray-200">
                     {move || {
                         let locations = sorted_locations.get();
