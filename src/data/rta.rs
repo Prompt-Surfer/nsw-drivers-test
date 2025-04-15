@@ -26,7 +26,7 @@ pub async fn scrape_rta_timeslots(
     }
     caps.add_arg("--no-sandbox")?;
     caps.add_arg("--disable-dev-shm-usage")?;
-    caps.add_arg("user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.5060.114 Safari/537.36")?;
+    caps.add_arg("--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.5060.114 Safari/537.36")?;
     caps.add_arg("--disable-blink-features=AutomationControlled")?;
 
     let driver = WebDriver::new(settings.selenium_driver_url.clone(), caps).await?;
