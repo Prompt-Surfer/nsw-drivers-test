@@ -596,7 +596,7 @@ pub fn HomePage() -> impl IntoView {
                                 }
                             }
                         />
-                        <p class="mt-1 text-xs text-gray-500 italic">Your search data is processed locally and not sent to our servers.</p>
+                        <p class="mt-1 text-xs text-gray-500 italic">Your search is securely processed through nominatim.org, a trusted open-source geolocation service. No personal or identifying information is shared during this process.</p>
                     </div>
                 </div>
 
