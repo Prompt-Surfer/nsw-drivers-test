@@ -42,6 +42,8 @@ NSW Drivers Test is a web application that helps learner drivers find the earlie
 git clone https://github.com/teehee567/nsw-drivers-test.git
 cd nsw-drivers-test
 
+# Create a file .env and fill in with same details as .envexample
+
 # Run Docker Compose
 docker-compose up -d
 
