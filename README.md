@@ -1,5 +1,7 @@
 # NSW Drivers Test - Find Available Test Times
 
+### LIVE: [driverstest.noob.place](https://driverstest.noob.place)
+
 A modern, efficient tool for checking driving test availability across Service NSW centers.
 
 ![Home Page](dev/images/homepage.png)
