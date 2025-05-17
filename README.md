@@ -22,13 +22,13 @@ NSW Drivers Test is a web application that helps learner drivers find the earlie
 
 ## Features
 
-- 🔍 **Location Search**: Find Service NSW centers by address, suburb, or postcode
-- 📍 **Distance Calculation**: View centers ordered by distance from your location
-- 📅 **Availability Tracking**: See the earliest available test slot for each location
-- 🔄 **Auto Refresh**: Data automatically refreshes to keep information current
-- 🔒 **Privacy-focused**: Location searches processed locally in your browser
-- 📱 **Responsive Design**: Works on desktop, tablet, and mobile devices
-- 🚫 **No Login Required**: No Service NSW credentials needed to view availability
+- **Location Search**: Find Service NSW centers by address, suburb, or postcode
+- **Distance Calculation**: View centers ordered by distance from your location
+- **Availability Tracking**: See the earliest available test slot for each location
+- **Auto Refresh**: Data automatically refreshes to keep information current
+- **Privacy-focused**: Location searches processed locally in your browser
+- **Responsive Design**: Works on desktop, tablet, and mobile devices
+- **No Login Required**: No Service NSW credentials needed to view availability
 
 ## Installation
 
