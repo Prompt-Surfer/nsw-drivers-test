@@ -117,9 +117,9 @@ pub async fn scrape_rta_timeslots<'a>(
     let mut location_bookings: HashMap<&'a str, LocationBookings> = HashMap::new();
 
     let mut caps = DesiredCapabilities::chrome();
-    if settings.headless {
-        caps.add_arg("--headless")?;
-    }
+    // if settings.headless {
+    //     caps.add_arg("--headless")?;
+    // }
     caps.add_arg("--no-sandbox")?;
     caps.add_arg("--disable-dev-shm-usage")?;
     caps.add_arg("user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.5060.114 Safari/537.36")?;
@@ -132,6 +132,10 @@ pub async fn scrape_rta_timeslots<'a>(
 
     driver.execute("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})", vec![]).await?;
     driver.goto("https://www.myrta.com/wps/portal/extvp/myrta/login/").await?;
+
+    let location_select_dropdown = driver.query(By::Id("loginTypeExisting")).first().await?;
+    location_select_dropdown.wait_until().wait(timeout, polling).displayed().await?;
+    location_select_dropdown.click().await?;
 
     let username_input = driver.query(By::Id("widget_cardNumber")).first().await?;
     username_input.wait_until().wait(timeout, polling).displayed().await?;
