@@ -1,6 +1,21 @@
+use std::collections::HashMap;
+use std::time::Duration;
+
+use leptos::prelude::*;
+use leptos::server_fn::error::NoCustomError;
+use reqwest::header;
+use serde::{Deserialize, Serialize};
+use web_sys::wasm_bindgen::prelude::Closure;
+
+use crate::data::location::LocationManager;
+use crate::data::shared_booking::TimeSlot;
+use crate::utils::date::format_iso_date;
+use crate::utils::geocoding::geocode_address;
+
+use crate::pages::location_details::ExpandedLocationDetails;
 
 #[component]
-fn LocationRow(
+pub fn LocationRow(
     loc: crate::data::location::Location,
     distance: f64,
     earliest_slot: Option<TimeSlot>,

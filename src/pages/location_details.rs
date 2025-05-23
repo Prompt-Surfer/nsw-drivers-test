@@ -1,7 +1,21 @@
+use std::collections::HashMap;
+use std::time::Duration;
 
+use leptos::prelude::*;
+use leptos::server_fn::error::NoCustomError;
+use reqwest::header;
+use serde::{Deserialize, Serialize};
+use web_sys::wasm_bindgen::prelude::Closure;
+
+use crate::data::location::LocationManager;
+use crate::data::shared_booking::TimeSlot;
+use crate::utils::date::format_iso_date;
+use crate::utils::geocoding::geocode_address;
+
+use crate::pages::home::get_location_details;
 
 #[component]
-fn ExpandedLocationDetails(location_id: String, expanded: ReadSignal<bool>) -> impl IntoView {
+pub fn ExpandedLocationDetails(location_id: String, expanded: ReadSignal<bool>) -> impl IntoView {
     let (slots, set_slots) = create_signal(Vec::<TimeSlot>::new());
     let (is_loading, set_is_loading) = create_signal(false);
     let (error, set_error) = create_signal::<Option<String>>(None);
