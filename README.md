@@ -1,5 +1,7 @@
 # NSW Drivers Test - Find Available Test Times
 
+### LIVE: [driverstest.noob.place](https://driverstest.noob.place)
+
 A modern, efficient tool for checking driving test availability across Service NSW centers.
 
 ![Home Page](dev/images/homepage.png)
@@ -20,13 +22,13 @@ NSW Drivers Test is a web application that helps learner drivers find the earlie
 
 ## Features
 
-- 🔍 **Location Search**: Find Service NSW centers by address, suburb, or postcode
-- 📍 **Distance Calculation**: View centers ordered by distance from your location
-- 📅 **Availability Tracking**: See the earliest available test slot for each location
-- 🔄 **Auto Refresh**: Data automatically refreshes to keep information current
-- 🔒 **Privacy-focused**: Location searches processed locally in your browser
-- 📱 **Responsive Design**: Works on desktop, tablet, and mobile devices
-- 🚫 **No Login Required**: No Service NSW credentials needed to view availability
+- **Location Search**: Find Service NSW centers by address, suburb, or postcode
+- **Distance Calculation**: View centers ordered by distance from your location
+- **Availability Tracking**: See the earliest available test slot for each location
+- **Auto Refresh**: Data automatically refreshes to keep information current
+- **Privacy-focused**: Location searches processed locally in your browser
+- **Responsive Design**: Works on desktop, tablet, and mobile devices
+- **No Login Required**: No Service NSW credentials needed to view availability
 
 ## Installation
 
@@ -41,6 +43,8 @@ NSW Drivers Test is a web application that helps learner drivers find the earlie
 # Clone the repository
 git clone https://github.com/teehee567/nsw-drivers-test.git
 cd nsw-drivers-test
+
+# Create a file .env and fill in with same details as .envexample
 
 # Run Docker Compose
 docker-compose up -d
