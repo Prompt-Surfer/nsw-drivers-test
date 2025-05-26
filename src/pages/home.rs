@@ -11,9 +11,6 @@ use crate::data::location::LocationManager;
 use crate::data::shared_booking::TimeSlot;
 use crate::utils::date::format_iso_date;
 use crate::utils::geocoding::geocode_address;
-
-use crate::pages::location_details::ExpandedLocationDetails;
-use crate::pages::location_row::LocationRow;
 use crate::pages::location_table::LocationsTable;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -118,6 +115,8 @@ pub fn HomePage() -> impl IntoView {
 
     let (booking_etag, set_booking_etag) = create_signal(String::new());
 
+    let (reset_sort_trigger, set_reset_sort_trigger) = create_signal(());
+
     let location_manager = LocationManager::new();
 
     let fetch_bookings = move || {
@@ -184,6 +183,7 @@ pub fn HomePage() -> impl IntoView {
                     set_current_location_name(result.display_name);
                     set_geocoding_status(None);
                     set_is_loading(false);
+                    set_reset_sort_trigger(());
                 }
                 Err(err) => {
                     set_geocoding_status(Some(format!("Error: {}", err)));
@@ -314,6 +314,7 @@ pub fn HomePage() -> impl IntoView {
                 latitude=latitude
                 longitude=longitude
                 location_manager=location_manager.clone()
+                reset_sort_trigger=reset_sort_trigger
             />
 
             <div class="mt-6 flex justify-between items-center">

@@ -16,7 +16,7 @@ use crate::pages::home::LocationBookingViewModel;
 
 use crate::pages::location_row::LocationRow;
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum SortColumn {
     Name,
     Distance,
@@ -24,7 +24,7 @@ enum SortColumn {
     PassRate,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum SortDirection {
     Ascending,
     Descending,
@@ -35,7 +35,7 @@ fn SortableHeader(
     column: SortColumn,
     current_sort: ReadSignal<SortColumn>,
     sort_direction: ReadSignal<SortDirection>,
-    on_sort: WriteSignal<SortColumn>,
+    on_sort: impl Fn(SortColumn) + 'static,
     title: &'static str,
     mobile_title: Option<&'static str>,
 ) -> impl IntoView {
@@ -54,7 +54,7 @@ fn SortableHeader(
         <th class="px-1 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
             <button
                 class="flex items-center gap-1 hover:text-gray-700 transition-colors"
-                on:click=move |_| on_sort.set(column)
+                on:click=move |_| on_sort(column)
             >
                 {move || {
                     if let Some(mobile) = mobile_title {
@@ -70,75 +70,95 @@ fn SortableHeader(
                         }.into_any()
                     }
                 }}
-                <span class="text-gray-400">{sort_icon}</span>
+                <span class="text-gray-400 font-sans">{sort_icon}</span>
             </button>
         </th>
     }
 }
 
 #[component]
-fn TableHeader(
-    sort_column: ReadSignal<SortColumn>,
-    sort_direction: ReadSignal<SortDirection>,
-    on_sort: WriteSignal<SortColumn>,
+pub fn LocationsTable(
+    bookings: ReadSignal<Vec<LocationBookingViewModel>>,
+    is_loading: ReadSignal<bool>,
+    latitude: ReadSignal<f64>,
+    longitude: ReadSignal<f64>,
+    location_manager: LocationManager,
+    reset_sort_trigger: ReadSignal<()>,
 ) -> impl IntoView {
-    view! {
-        <thead class="bg-gray-50">
-            <tr>
-                <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    <button
-                        class="flex items-center gap-1 hover:text-gray-700 transition-colors"
-                        on:click=move |_| on_sort.set(SortColumn::Name)
-                    >
-                        <span>Name</span>
-                        <span class="text-gray-400">
-                            {move || if sort_column.get() == SortColumn::Name {
-                                match sort_direction.get() {
-                                    SortDirection::Ascending => "↑",
-                                    SortDirection::Descending => "↓",
-                                }
-                            } else {
-                                "↕"
-                            }}
-                        </span>
-                    </button>
-                </th>
-                <SortableHeader
-                    column=SortColumn::Distance
-                    current_sort=sort_column
-                    sort_direction=sort_direction
-                    on_sort=on_sort
-                    title="Distance"
-                    mobile_title=Some("Dist")
-                />
-                <SortableHeader
-                    column=SortColumn::EarliestSlot
-                    current_sort=sort_column
-                    sort_direction=sort_direction
-                    on_sort=on_sort
-                    title="Earliest Slot"
-                    mobile_title=Some("Slot")
-                />
-                <SortableHeader
-                    column=SortColumn::PassRate
-                    current_sort=sort_column
-                    sort_direction=sort_direction
-                    on_sort=on_sort
-                    title="Pass Rate"
-                    mobile_title=Some("Pass %")
-                />
-                <th class="px-1 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    <span class="sr-only">Details</span>
-                </th>
-            </tr>
-        </thead>
-    }
-}
+    let booking_map = create_memo(move |_| {
+        bookings
+            .get()
+            .into_iter()
+            .map(|booking| (booking.location.clone(), booking.earliest_slot))
+            .collect::<HashMap<String, Option<TimeSlot>>>()
+    });
 
-#[component]
-fn InfoBanner() -> impl IntoView {
+    let (sort_column, set_sort_column) = create_signal(SortColumn::Distance);
+    let (sort_direction, set_sort_direction) = create_signal(SortDirection::Ascending);
+
+    create_effect(move |_| {
+        reset_sort_trigger.get();
+        set_sort_column(SortColumn::Distance);
+        set_sort_direction(SortDirection::Ascending);
+    });
+
+    let handle_sort_click = move |new_column: SortColumn| {
+        let current_column = sort_column.get();
+        if current_column == new_column {
+            set_sort_direction.update(|dir| {
+                *dir = match dir {
+                    SortDirection::Ascending => SortDirection::Descending,
+                    SortDirection::Descending => SortDirection::Ascending,
+                }
+            });
+        } else {
+            set_sort_column(new_column);
+            set_sort_direction(SortDirection::Ascending);
+        }
+    };
+
+    let sorted_locations = create_memo(move |_| {
+        let mut locations_by_distance =
+            location_manager.get_by_distance(latitude.get(), longitude.get());
+        let booking_data = booking_map.get();
+        let column = sort_column.get();
+        let direction = sort_direction.get();
+
+        let mut locations_with_data: Vec<_> = locations_by_distance
+            .into_iter()
+            .map(|(loc, distance)| {
+                let location_id = loc.id.to_string();
+                let earliest_slot = booking_data.get(&location_id).cloned().flatten();
+                (loc, distance, earliest_slot)
+            })
+            .collect();
+
+        locations_with_data.sort_by(|a, b| {
+            let ordering = match column {
+                SortColumn::Name => a.0.name.cmp(&b.0.name),
+                SortColumn::Distance => a.1.total_cmp(&b.1),
+                SortColumn::EarliestSlot => {
+                    match (&a.2, &b.2) {
+                        (Some(slot_a), Some(slot_b)) => slot_a.start_time.cmp(&slot_b.start_time),
+                        (Some(_), None) => std::cmp::Ordering::Less,
+                        (None, Some(_)) => std::cmp::Ordering::Greater,
+                        (None, None) => std::cmp::Ordering::Equal,
+                    }
+                },
+                SortColumn::PassRate => b.0.pass_rate.partial_cmp(&a.0.pass_rate).unwrap_or(std::cmp::Ordering::Equal),
+            };
+
+            match direction {
+                SortDirection::Ascending => ordering,
+                SortDirection::Descending => ordering.reverse(),
+            }
+        });
+
+        locations_with_data
+    });
+
     view! {
-        <>
+        <div>
             <div class="md:hidden flex justify-center items-center bg-blue-50 p-3 mb-3 rounded-lg border border-blue-200">
                 <div class="flex items-center gap-2 text-sm text-blue-800">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -154,89 +174,6 @@ fn InfoBanner() -> impl IntoView {
                 </svg>
                 <span>Click on any row to view available time slots for that location</span>
             </div>
-        </>
-    }
-}
-
-#[component]
-pub fn LocationsTable(
-    bookings: ReadSignal<Vec<LocationBookingViewModel>>,
-    is_loading: ReadSignal<bool>,
-    latitude: ReadSignal<f64>,
-    longitude: ReadSignal<f64>,
-    location_manager: LocationManager,
-) -> impl IntoView {
-    let (sort_column, set_sort_column) = create_signal(SortColumn::Distance);
-    let (sort_direction, set_sort_direction) = create_signal(SortDirection::Descending);
-
-    let booking_map = create_memo(move |_| {
-        bookings
-            .get()
-            .into_iter()
-            .map(|booking| (booking.location.clone(), booking.earliest_slot))
-            .collect::<HashMap<String, Option<TimeSlot>>>()
-    });
-
-    let sorted_locations = create_memo(move |_| {
-        let mut locations_by_distance =
-            location_manager.get_by_distance(latitude.get(), longitude.get());
-        
-        let booking_data = booking_map.get();
-        let current_sort = sort_column.get();
-        let current_direction = sort_direction.get();
-        
-        locations_by_distance.sort_by(|a, b| {
-            let comparison = match current_sort {
-                SortColumn::Name => a.0.name.cmp(&b.0.name),
-                SortColumn::Distance => a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal),
-                SortColumn::EarliestSlot => {
-                    let a_slot = booking_data.get(&a.0.id.to_string()).cloned().flatten();
-                    let b_slot = booking_data.get(&b.0.id.to_string()).cloned().flatten();
-                    
-                    match (a_slot, b_slot) {
-                        (Some(a_time), Some(b_time)) => a_time.start_time.cmp(&b_time.start_time),
-                        (Some(_), None) => std::cmp::Ordering::Less,
-                        (None, Some(_)) => std::cmp::Ordering::Greater,
-                        (None, None) => std::cmp::Ordering::Equal,
-                    }
-                },
-                SortColumn::PassRate => {
-                    a.0.pass_rate.partial_cmp(&b.0.pass_rate).unwrap_or(std::cmp::Ordering::Equal)
-                },
-            };
-            
-            match current_direction {
-                SortDirection::Ascending => comparison,
-                SortDirection::Descending => comparison.reverse(),
-            }
-        });
-        
-        locations_by_distance
-    });
-
-    let handle_sort = move |column: SortColumn| {
-        if sort_column.get() == column {
-            set_sort_direction.update(|dir| {
-                *dir = match *dir {
-                    SortDirection::Ascending => SortDirection::Descending,
-                    SortDirection::Descending => SortDirection::Ascending,
-                }
-            });
-        } else {
-            set_sort_column.set(column);
-            set_sort_direction.set(SortDirection::Descending);
-        }
-    };
-
-    let (sort_trigger, set_sort_trigger) = create_signal(SortColumn::Distance);
-    
-    create_effect(move |_| {
-        handle_sort(sort_trigger.get());
-    });
-
-    view! {
-        <div>
-            <InfoBanner />
             <div class="overflow-x-auto">
                 <table class="min-w-full bg-white border border-gray-200 rounded-lg overflow-hidden table-fixed">
                     <colgroup>
@@ -246,20 +183,50 @@ pub fn LocationsTable(
                         <col style="width: 15%;" />
                         <col style="width: 10%;" />
                     </colgroup>
-                    <TableHeader
-                        sort_column=sort_column
-                        sort_direction=sort_direction
-                        on_sort=set_sort_trigger
-                    />
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <SortableHeader
+                                column=SortColumn::Name
+                                current_sort=sort_column
+                                sort_direction=sort_direction
+                                on_sort=handle_sort_click
+                                title="Name"
+                                mobile_title=None
+                            />
+                            <SortableHeader
+                                column=SortColumn::Distance
+                                current_sort=sort_column
+                                sort_direction=sort_direction
+                                on_sort=handle_sort_click
+                                title="Distance"
+                                mobile_title=Some("Dist")
+                            />
+                            <SortableHeader
+                                column=SortColumn::EarliestSlot
+                                current_sort=sort_column
+                                sort_direction=sort_direction
+                                on_sort=handle_sort_click
+                                title="Earliest Slot"
+                                mobile_title=Some("Slot")
+                            />
+                            <SortableHeader
+                                column=SortColumn::PassRate
+                                current_sort=sort_column
+                                sort_direction=sort_direction
+                                on_sort=handle_sort_click
+                                title="Pass Rate"
+                                mobile_title=Some("Pass %")
+                            />
+                            <th class="px-1 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <span class="sr-only">Details</span>
+                            </th>
+                        </tr>
+                    </thead>
                     <tbody class="divide-y divide-gray-200">
                         {move || {
-                            let locations = sorted_locations.get();
-                            let booking_data = booking_map.get();
+                            let locations_data = sorted_locations.get();
 
-                            locations.into_iter().map(|(loc, distance)| {
-                                let location_id = loc.id.to_string();
-                                let earliest_slot = booking_data.get(&location_id).cloned().flatten();
-
+                            locations_data.into_iter().map(|(loc, distance, earliest_slot)| {
                                 view! {
                                     <LocationRow
                                         loc=loc
