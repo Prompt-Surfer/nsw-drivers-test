@@ -1,3 +1,4 @@
+#![recursion_limit = "512"]
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
