@@ -9,7 +9,7 @@ use web_sys::wasm_bindgen::prelude::Closure;
 
 use crate::data::location::LocationManager;
 use crate::data::shared_booking::TimeSlot;
-use crate::utils::date::format_iso_date;
+use crate::utils::date::TimeDisplay;
 use crate::utils::geocoding::geocode_address;
 use crate::pages::location_table::LocationsTable;
 
@@ -262,8 +262,10 @@ pub fn HomePage() -> impl IntoView {
 
                     <div class="ml-auto text-sm text-gray-500">
                         {move || match last_updated.get() {
-                            Some(time) => format!("Data last updated: {}", format_iso_date(&time)),
-                            None => "Data last updated: unknown".to_string(),
+                            Some(time) => view! {
+                                <span>"Data last updated: " <TimeDisplay iso_time={time} /></span>
+                            }.into_any(),
+                            None => view! { <span>"Data last updated: unknown"</span> }.into_any(),
                         }}
                     </div>
                 </div>
