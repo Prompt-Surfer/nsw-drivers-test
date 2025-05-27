@@ -25,7 +25,21 @@ impl PartialOrd for TimeSlot {
 
 impl Ord for TimeSlot {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.start_time.cmp(&other.start_time)
+        // self
+        let self_parts: Vec<&str> = self.start_time.split(' ').collect();
+        let self_date_parts: Vec<u32> = self_parts[0].split('/').map(|s| s.parse().unwrap()).collect();
+        let self_time_parts: Vec<u32> = self_parts[1].split(':').map(|s| s.parse().unwrap()).collect();
+        
+        // other
+        let other_parts: Vec<&str> = other.start_time.split(' ').collect();
+        let other_date_parts: Vec<u32> = other_parts[0].split('/').map(|s| s.parse().unwrap()).collect();
+        let other_time_parts: Vec<u32> = other_parts[1].split(':').map(|s| s.parse().unwrap()).collect();
+        
+        self_date_parts[2].cmp(&other_date_parts[2])
+            .then(self_date_parts[1].cmp(&other_date_parts[1]))
+            .then(self_date_parts[0].cmp(&other_date_parts[0]))
+            .then(self_time_parts[0].cmp(&other_time_parts[0]))
+            .then(self_time_parts[1].cmp(&other_time_parts[1]))
     }
 }
 
