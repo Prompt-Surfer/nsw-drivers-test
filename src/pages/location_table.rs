@@ -139,7 +139,7 @@ pub fn LocationsTable(
                 SortColumn::Distance => a.1.total_cmp(&b.1),
                 SortColumn::EarliestSlot => {
                     match (&a.2, &b.2) {
-                        (Some(slot_a), Some(slot_b)) => slot_a.start_time.cmp(&slot_b.start_time),
+                        (Some(slot_a), Some(slot_b)) => slot_a.cmp(&slot_b),
                         (Some(_), None) => std::cmp::Ordering::Less,
                         (None, Some(_)) => std::cmp::Ordering::Greater,
                         (None, None) => std::cmp::Ordering::Equal,
