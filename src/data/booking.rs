@@ -84,7 +84,7 @@ impl BookingManager {
     pub fn save_to_file(file_path: &str) -> Result<(), String> {
         let data_guard = get_booking_data().read().unwrap();
 
-        serde_json::to_string_pretty(&*data_guard)
+        serde_json::to_string_pretty(&data_guard.0)
             .map_err(|e| format!("Failed to serialize data: {}", e))
             .and_then(|json_str| {
                 fs::write(file_path, json_str)
@@ -159,10 +159,6 @@ impl BookingManager {
 
     pub async fn perform_update(locations: Vec<String>, file_path: &str, settings: Settings) {
         let max_retries = settings.retries;
-
-        if locations.is_empty() {
-            return;
-        }
 
         let mut final_results: HashMap<String, LocationBookings> = HashMap::new();
         let mut remaining_locations = locations.clone();
@@ -241,50 +237,4 @@ impl BookingManager {
             println!("INFO: Update process complete. Data saved to '{}'.", file_path);
         }
     }
-
-    pub async fn perform_updates(initial_locations: Vec<String>, file_path: &str, settings: Settings) {
-        let max_retries = settings.retries;
-
-        let mut remaining_locations: HashSet<String> = initial_locations.into_iter().collect();
-        let mut successful_results: HashMap<String, LocationBookings> = HashMap::new();
-
-        for attempt in 1..=max_retries {
-            if remaining_locations.is_empty() {
-                break;
-            }
-
-            let current_batch: Vec<String> = remaining_locations.iter().cloned().collect();
-
-            match super::rta::scrape_rta_timeslots(current_batch, &settings).await {
-                Ok(partial_result_map) => {
-                    let received_count = partial_result_map.len();
-
-                    for (location_str, booking_data) in partial_result_map {
-                        if remaining_locations.remove(&location_str) {
-                             successful_results.insert(location_str.clone(), booking_data);
-                        }
-                    }
-
-                }
-                Err(e) => {
-                    eprintln!(
-                        "Scraping failed entirely on attempt {}/{}: {:?}",
-                        attempt, max_retries, e
-                    );
-                }
-            }
-
-            if !remaining_locations.is_empty() && attempt < max_retries {
-                tokio::time::sleep(Duration::from_secs(5)).await;
-            }
-        }
-
-        if !successful_results.is_empty() {
-            Self::update_data(successful_results.into_values().collect());
-            if let Err(e) = Self::save_to_file(file_path) {
-                eprintln!("Failed to save booking data to file: {}", e);
-            }
-        }
-    }
-
 }

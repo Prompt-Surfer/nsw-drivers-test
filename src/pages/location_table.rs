@@ -42,11 +42,11 @@ fn SortableHeader(
     let sort_icon = move || {
         if current_sort.get() == column {
             match sort_direction.get() {
-                SortDirection::Ascending => "↑",
-                SortDirection::Descending => "↓",
+                SortDirection::Ascending => "↑\u{FE0E}",
+                SortDirection::Descending => "↓\u{FE0E}",
             }
         } else {
-            "↕"
+            "↕\u{FE0E}"
         }
     };
 
@@ -70,7 +70,7 @@ fn SortableHeader(
                         }.into_any()
                     }
                 }}
-                <span class="text-gray-400 font-sans">{sort_icon}</span>
+                <span class="text-gray-400 font-sans" style="font-variant-emoji: text;">{sort_icon}</span>
             </button>
         </th>
     }
