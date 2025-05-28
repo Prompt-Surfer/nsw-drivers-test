@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use thirtyfour::components::SelectElement;
 use thirtyfour::{By, DesiredCapabilities, WebDriver};
 use thirtyfour::prelude::*;
+use rand::Rng;
 
 use std::env;
 use std::fs::File;
@@ -109,133 +110,194 @@ impl BookingData {
     }
 }
 
-pub async fn scrape_rta_timeslots<'a>(
-    locations: Vec<&'a str>,
-    settings: &Settings
-) -> WebDriverResult<HashMap<&'a str, LocationBookings>> {
 
-    let mut location_bookings: HashMap<&'a str, LocationBookings> = HashMap::new();
+async fn random_sleep(min_millis: u64, max_millis: u64) {
+    if min_millis >= max_millis {
+        tokio::time::sleep(Duration::from_millis(min_millis)).await;
+        return;
+    }
+    let duration = rand::thread_rng().gen_range(min_millis..max_millis);
+    tokio::time::sleep(Duration::from_millis(duration)).await;
+}
+
+async fn type_like_human(element: &WebElement, text: &str, min_delay_ms: u64, max_delay_ms: u64) -> WebDriverResult<()> {
+    for char in text.chars() {
+        element.send_keys(char.to_string()).await?;
+        random_sleep(min_delay_ms, max_delay_ms).await;
+    }
+    Ok(())
+}
+
+pub async fn scrape_rta_timeslots(
+    locations: Vec<String>,
+    settings: &Settings
+) -> WebDriverResult<HashMap<String, LocationBookings>> {
+
+    let mut location_bookings: HashMap<String, LocationBookings> = HashMap::new();
 
     let mut caps = DesiredCapabilities::chrome();
-    // if settings.headless {
-    //     caps.add_arg("--headless")?;
-    // }
+    if settings.headless {
+        caps.add_arg("--headless=new")?;
+    }
     caps.add_arg("--no-sandbox")?;
     caps.add_arg("--disable-dev-shm-usage")?;
-    caps.add_arg("user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.5060.114 Safari/537.36")?;
+    caps.add_arg("--window-size=1920,1080")?;
+    caps.add_arg("--start-maximized")?;
+    caps.add_arg("--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.5060.114 Safari/537.36")?;
     caps.add_arg("--disable-blink-features=AutomationControlled")?;
+    caps.add_experimental_option("excludeSwitches", vec!["enable-automation"]);
+    caps.add_experimental_option("useAutomationExtension", false);
+
 
     let driver = WebDriver::new(settings.selenium_driver_url.clone(), caps).await?;
+
+    driver.execute(r#"
+        Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+        // Minimal spoofing of window.chrome, might need adjustment
+        window.chrome = window.chrome || {};
+        window.chrome.runtime = window.chrome.runtime || {};
+        // Attempt to remove cdc_ properties (might not exist)
+        try {
+            let key = Object.keys(window).find(key => key.startsWith('cdc_'));
+            if (key) { delete window[key]; }
+            let docKey = Object.keys(document).find(key => key.startsWith('cdc_'));
+            if (docKey) { delete document[docKey]; }
+        } catch (e) { console.debug('Error removing cdc keys:', e); }
+    "#, Vec::new()).await?;
+
 
     let timeout = Duration::from_millis(settings.selenium_element_timout);
     let polling = Duration::from_millis(settings.selenium_element_polling);
 
-    driver.execute("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})", vec![]).await?;
     driver.goto("https://www.myrta.com/wps/portal/extvp/myrta/login/").await?;
-
-    let location_select_dropdown = driver.query(By::Id("loginTypeExisting")).first().await?;
-    location_select_dropdown.wait_until().wait(timeout, polling).displayed().await?;
-    location_select_dropdown.click().await?;
+    random_sleep(1000, 2000).await;
 
     let username_input = driver.query(By::Id("widget_cardNumber")).first().await?;
     username_input.wait_until().wait(timeout, polling).displayed().await?;
-    username_input.send_keys(&settings.username).await?;
+    random_sleep(200, 500).await;
+    type_like_human(&username_input, &settings.username, 60, 180).await?;
+    random_sleep(300, 700).await;
 
     let password_input = driver.query(By::Id("widget_password")).first().await?;
     password_input.wait_until().wait(timeout, polling).displayed().await?;
-    password_input.send_keys(&settings.password).await?;
+    random_sleep(200, 500).await;
+    type_like_human(&password_input, &settings.password, 60, 180).await?;
+    random_sleep(400, 800).await;
 
     let next_button = driver.query(By::Id("nextButton")).first().await?;
-    next_button.wait_until().wait(timeout, polling).has_attribute("aria-disabled", "false").await?;
+    next_button.wait_until().wait(timeout, polling).displayed().await?;
+    // next_button.wait_until().wait(timeout, polling).has_attribute("aria-disabled", "false").await?; // Alternative if clickable() doesn't work
+    random_sleep(250, 600).await;
     next_button.click().await?;
+
+    random_sleep(2000, 4000).await;
 
     if settings.have_booking {
         let manage_booking = driver.query(By::XPath("//*[text()=\"Manage booking\"]")).first().await?;
         manage_booking.wait_until().wait(timeout, polling).displayed().await?;
+        random_sleep(200, 500).await;
         manage_booking.click().await?;
+        random_sleep(1500, 2500).await;
 
         let change_location = driver.query(By::Id("changeLocationButton")).first().await?;
         change_location.wait_until().wait(timeout, polling).displayed().await?;
+        random_sleep(200, 500).await;
         change_location.click().await?;
+        random_sleep(1000, 2000).await;
+
     } else {
-        let book_test = driver.query(By::XPath("//*[text()=\"Book test\"]")).first().await?;
-        book_test.wait_until().wait(timeout, polling).displayed().await?;
-        book_test.click().await?;
+         let book_test = driver.query(By::XPath("//*[text()=\"Book test\"]")).first().await?;
+         book_test.wait_until().wait(timeout, polling).displayed().await?;
+         random_sleep(200, 500).await;
+         book_test.click().await?;
+         random_sleep(1500, 2500).await;
 
-        let car_option = driver.query(By::Id("CAR")).first().await?;
-        car_option.wait_until().wait(timeout, polling).displayed().await?;
-        car_option.click().await?;
+         let car_option = driver.query(By::Id("CAR")).first().await?;
+         car_option.wait_until().wait(timeout, polling).displayed().await?;
+         random_sleep(200, 500).await;
+         car_option.click().await?;
+         random_sleep(500, 1000).await;
 
-        let test_item = driver.query(By::XPath("//fieldset[@id='DC']/span[contains(@class, 'rms_testItemResult')]")).first().await?;
-        test_item.wait_until().wait(timeout, polling).displayed().await?;
-        test_item.click().await?;
+         let test_item = driver.query(By::XPath("//fieldset[@id='DC']/span[contains(@class, 'rms_testItemResult')]")).first().await?;
+         test_item.wait_until().wait(timeout, polling).displayed().await?;
+         random_sleep(200, 500).await;
+         test_item.click().await?;
+         random_sleep(500, 1000).await;
 
-        let next_button = driver.query(By::Id("nextButton")).first().await?;
-        next_button.wait_until().wait(timeout, polling).displayed().await?;
-        next_button.click().await?;
+         let next_button = driver.query(By::Id("nextButton")).first().await?;
+         next_button.wait_until().wait(timeout, polling).displayed().await?;
+         random_sleep(200, 500).await;
+         next_button.click().await?;
+         random_sleep(1500, 2500).await;
 
-        let check_terms = driver.query(By::Id("checkTerms")).first().await?;
-        check_terms.wait_until().wait(timeout, polling).displayed().await?;
-        check_terms.click().await?;
+         let check_terms = driver.query(By::Id("checkTerms")).first().await?;
+         check_terms.wait_until().wait(timeout, polling).displayed().await?;
+         random_sleep(100, 300).await;
+         check_terms.click().await?;
+         random_sleep(500, 1000).await;
 
-        let next_button = driver.query(By::Id("nextButton")).first().await?;
-        next_button.wait_until().wait(timeout, polling).displayed().await?;
-        next_button.click().await?;
-
+         let next_button_terms = driver.query(By::Id("nextButton")).first().await?;
+         next_button_terms.wait_until().wait(timeout, polling).displayed().await?;
+         random_sleep(200, 500).await;
+         next_button_terms.click().await?;
+         random_sleep(1000, 2000).await;
     }
 
-    for location in locations.iter() {
-
+    for location in locations {
+        println!("INFO: Processing location: {}", location);
         let process_result: WebDriverResult<LocationBookings> = async {
 
-            tokio::time::sleep(Duration::from_secs(1)).await;
+            random_sleep(1000, 2000).await;
 
             let location_select_dropdown = driver.query(By::Id("rms_batLocLocSel")).first().await?;
             location_select_dropdown.wait_until().wait(timeout, polling).displayed().await?;
+            random_sleep(200, 400).await;
             location_select_dropdown.click().await?;
+            random_sleep(500, 1000).await;
 
-            let select_element = driver.query(By::Id("rms_batLocationSelect2")).first().await?;
+            let select_element_query = driver.query(By::Id("rms_batLocationSelect2"));
+            let select_element = select_element_query.wait(timeout, polling).first().await?;
             select_element.wait_until().wait(timeout, polling).displayed().await?;
             let select_box = SelectElement::new(&select_element).await?;
 
-            // FIX: might not need htis
-            let location_value = format!("{} Service NSW Centre", location);
-
-            if let Err(e) = select_box.select_by_value(&location_value).await {
+            if let Err(e) = select_box.select_by_value(&location).await {
                  eprintln!("ERROR: Failed to select location '{}' in dropdown: {}. Ensure the value is correct.", location, e);
                  return Err(e);
             }
 
             println!("INFO: Selected location: {}", location);
-            tokio::time::sleep(Duration::from_secs(3)).await;
+            random_sleep(2500, 4000).await;
 
-            let next_button = driver.query(By::Id("nextButton")).first().await?;
-            next_button.wait_until().wait(timeout, polling).displayed().await?;
-            next_button.click().await?;
+            let next_button_loc = driver.query(By::Id("nextButton")).first().await?;
+            next_button_loc.wait_until().wait(timeout, polling).displayed().await?;
+            random_sleep(200, 500).await;
+            next_button_loc.click().await?;
 
-            tokio::time::sleep(Duration::from_secs(1)).await;
+            random_sleep(1000, 2000).await;
 
             match driver.query(By::Id("getEarliestTime")).first().await {
                 Ok(element) => {
-                    let is_displayed = element.is_displayed().await.unwrap_or(false);
-                    let is_enabled = element.is_enabled().await.unwrap_or(false);
-                    if is_displayed && is_enabled {
+                     if element.is_clickable().await.unwrap_or(false) {
                          println!("INFO: Found 'Get Earliest Time' button, attempting click.");
-                        if let Err(e) = element.click().await {
+                         random_sleep(200, 400).await;
+                         if let Err(e) = element.click().await {
                             eprintln!("WARN: Failed to click 'Get Earliest Time' button for {}: {}. Proceeding anyway.", location, e);
-                        } else {
+                         } else {
                              println!("INFO: Clicked 'Get Earliest Time'.");
-                        }
-                    } else {
-                        println!("INFO: 'Get Earliest Time' button found but not displayed/enabled.");
-                    }
+                             random_sleep(2500, 4500).await;
+                         }
+                     } else {
+                         println!("INFO: 'Get Earliest Time' button found but not clickable (visible/enabled).");
+                         random_sleep(500, 1000).await;
+                     }
                 },
                 Err(_) => {
-                    println!("INFO: 'Get Earliest Time' button not found for {}.", location);
+                    println!("INFO: 'Get Earliest Time' button not found for {}. Proceeding.", location);
+                    random_sleep(500, 1000).await;
                 },
             }
 
-            tokio::time::sleep(Duration::from_secs(3)).await;
+            random_sleep(1000, 2500).await;
 
             let timeslots = driver.execute("return timeslots", vec![]).await?;
 
@@ -253,6 +315,7 @@ pub async fn scrape_rta_timeslots<'a>(
                 .and_then(|list| serde_json::from_value(list.clone()).ok())
                 .unwrap_or_else(Vec::new);
 
+
             println!("INFO: Parsed {} slots for {}. Next available: {:?}", slots.len(), location, next_available_date);
 
             let location_result = LocationBookings {
@@ -261,43 +324,48 @@ pub async fn scrape_rta_timeslots<'a>(
                 next_available_date,
             };
 
-            tokio::time::sleep(Duration::from_secs(1)).await;
+            random_sleep(800, 1500).await;
 
             let another_location_link = driver.query(By::Id("anotherLocationLink")).first().await?;
             another_location_link.wait_until().wait(timeout, polling).displayed().await?;
+            random_sleep(200, 500).await;
             another_location_link.click().await?;
 
             Ok(location_result)
-
 
         }.await;
 
         match process_result {
             Ok(booking_data) => {
-                location_bookings.insert(*location, booking_data);
+                location_bookings.insert(location.clone(), booking_data);
             }
             Err(e) => {
+                 eprintln!("ERROR: Failed processing location {}: {}", location, e);
                  match driver.query(By::Id("anotherLocationLink")).first().await {
                      Ok(link) => {
-                         if let Err(click_err) = link.click().await {
-                             eprintln!("WARN: Recovery click failed: {}", click_err);
-                         } else {
-                             println!("INFO: Recovery click succeeded.");
-                         }
+                          if link.is_displayed().await.unwrap_or(false) {
+                              eprintln!("INFO: Attempting recovery click on 'Another Location'.");
+                              if let Err(click_err) = link.click().await {
+                                  eprintln!("WARN: Recovery click failed: {}", click_err);
+                              } else {
+                                  println!("INFO: Recovery click succeeded.");
+                              }
+                          } else {
+                              eprintln!("WARN: Recovery link found but not displayed.");
+                          }
                      }
                      Err(_) => {
-                         eprintln!("WARN: Recovery link not found.");
+                         eprintln!("WARN: Recovery link ('anotherLocationLink') not found. State unclear.");
                      }
                  }
-                 tokio::time::sleep(Duration::from_secs(2)).await;
-
-                continue;
+                 random_sleep(2000, 3000).await;
+                 continue;
             }
         }
-         tokio::time::sleep(Duration::from_secs(2)).await;
-
+         random_sleep(1500, 3000).await;
     }
 
+    println!("INFO: Finished scraping all locations. Quitting driver.");
     driver.quit().await?;
 
     Ok(location_bookings)
@@ -323,7 +391,8 @@ async fn main() {
     settings.username = username.unwrap();
     settings.password = password.unwrap();
     
-    let locations = vec!["Finley", "Hornsby", "Armidale", "Auburn", "Ballina"];
+    let locations = vec!["Queanbeyan", "Yass", "Finley", "Hornsby", "Armidale", "Auburn", "Ballina"];
+    let locations = locations.into_iter().map(|a| a.to_string()).collect();
     
     dbg!(scrape_rta_timeslots(locations, &settings).await);
 

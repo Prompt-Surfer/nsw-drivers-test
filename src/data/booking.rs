@@ -164,51 +164,81 @@ impl BookingManager {
             return;
         }
 
-        let mut final_results: Option<HashMap<String, LocationBookings>> = None;
+        let mut final_results: HashMap<String, LocationBookings> = HashMap::new();
+        let mut remaining_locations = locations.clone();
 
         for attempt in 1..=max_retries {
-            println!("INFO: Scraping attempt {}/{}...", attempt, max_retries);
-            match super::rta::scrape_rta_timeslots(locations.clone(), &settings).await // Pass Vec<&str>
-            {
+            if remaining_locations.is_empty() {
+                println!("INFO: All locations successfully scraped.");
+                break;
+            }
+
+            println!(
+                "INFO: Scraping attempt {}/{} for {} locations...", 
+                attempt, max_retries, remaining_locations.len()
+            );
+            
+            match super::rta::scrape_rta_timeslots(remaining_locations.clone(), &settings).await {
                 Ok(result_map) => {
                     println!(
-                        "INFO: Successfully scraped {} locations in attempt {}.",
-                        result_map.len(), attempt
+                        "INFO: Successfully scraped {}/{} locations in attempt {}.",
+                        result_map.len(), remaining_locations.len(), attempt
                     );
-                    let owned_result_map: HashMap<String, LocationBookings> = result_map
-                        .into_iter()
-                        .map(|(k, v)| (k.to_string(), v))
-                        .collect();
-                    final_results = Some(owned_result_map);
-                    break;
+                    
+                    for (k, v) in result_map {
+                        final_results.insert(k.to_string(), v);
+                    }
+                    
+                    remaining_locations.retain(|loc| !final_results.contains_key(loc));
+                    
+                    if remaining_locations.is_empty() {
+                        println!("INFO: All locations successfully scraped after {} attempts.", attempt);
+                        break;
+                    } else {
+                        println!(
+                            "WARN: {} locations still need to be scraped.",
+                            remaining_locations.len()
+                        );
+                    }
                 }
                 Err(e) => {
                     eprintln!(
                         "ERROR: Scraping failed on attempt {}/{}: {:?}",
                         attempt, max_retries, e
                     );
+                    
                     if attempt == max_retries {
                         eprintln!(
-                            "ERROR: Failed to scrape locations after {} attempts. No data will be updated.",
-                             max_retries
+                            "ERROR: Failed to scrape {} locations after {} attempts.",
+                            remaining_locations.len(), max_retries
                         );
-                        return;
+                        if final_results.is_empty() {
+                            eprintln!("ERROR: No data was successfully scraped. No update will be performed.");
+                            return;
+                        } else {
+                            eprintln!(
+                                "WARNING: Partial data collected. Successfully scraped {}/{} locations.",
+                                final_results.len(), locations.len()
+                            );
+                        }
                     }
-                    tokio::time::sleep(Duration::from_secs(5)).await;
                 }
+            }
+            
+            if attempt < max_retries && !remaining_locations.is_empty() {
+                tokio::time::sleep(Duration::from_secs(5)).await;
             }
         }
 
-        if let Some(result_map) = final_results {
-            let all_results: Vec<LocationBookings> = result_map.into_values().collect();
+        if !final_results.is_empty() {
+            let all_results: Vec<LocationBookings> = final_results.into_values().collect();
             Self::update_data(all_results);
-
         }
 
         if let Err(e) = Self::save_to_file(file_path) {
             eprintln!("ERROR: Failed to save booking data to file '{}': {}", file_path, e);
         } else {
-             println!("INFO: Update process complete. Data saved to '{}'.", file_path);
+            println!("INFO: Update process complete. Data saved to '{}'.", file_path);
         }
     }
 
