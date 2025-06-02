@@ -1,7 +1,7 @@
 headless: true
 username: "${USERNAME}"
 password: "${PASSWORD}"
-have_booking: true
+have_booking: false
 selenium_driver_url: "http://localhost:57908"
 selenium_element_timout: 20000
 selenium_element_polling: 100
