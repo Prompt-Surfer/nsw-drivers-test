@@ -1,9 +1,24 @@
-headless: true
-username: "${USERNAME}"
-password: "${PASSWORD}"
+headless: false
+username: "${MYRTA_USERNAME}"
+password: "${MYRTA_PASSWORD}"
 have_booking: false
 selenium_driver_url: "http://localhost:57908"
 selenium_element_timout: 20000
 selenium_element_polling: 100
 retries: 4
 scrape_refresh_time_min: 120
+
+# Filter to specific locations (empty = all locations)
+locations:
+  - "96"    # Ryde
+  - "621"   # North Rocks
+  - "241"   # Silverwater
+  - "63"    # Hornsby
+  - "35"    # Castle Hill
+  - "601"   # Auburn PCYC
+  - "37"    # Chatswood
+  - "112"   # Auburn
+
+# Date range filter (slots outside this range will be excluded)
+date_filter_start: "2026-02-01"
+date_filter_end: "2026-09-30"

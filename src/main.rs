@@ -45,7 +45,14 @@ async fn main() {
 
     let settings = Settings::from_yaml("settings.yaml").unwrap();
 
-    let location_id = get_location_names();
+    // Use filtered locations from settings, or all locations if empty
+    let location_id = if settings.locations.is_empty() {
+        get_location_names()
+    } else {
+        settings.locations.clone()
+    };
+    
+    println!("INFO: Scraping {} locations", location_id.len());
 
     BookingManager::start_background_updates(location_id, data_file_path.to_string(), settings);
 

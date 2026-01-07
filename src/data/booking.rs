@@ -1,3 +1,4 @@
+use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
@@ -92,11 +93,37 @@ impl BookingManager {
             })
     }
 
-    fn clean_data(results: Vec<LocationBookings>) -> Vec<LocationBookings> {
+    fn clean_data(results: Vec<LocationBookings>, settings: &Settings) -> Vec<LocationBookings> {
+        let start_date = settings.date_filter_start.as_ref()
+            .and_then(|s| NaiveDate::parse_from_str(s, "%Y-%m-%d").ok());
+        let end_date = settings.date_filter_end.as_ref()
+            .and_then(|s| NaiveDate::parse_from_str(s, "%Y-%m-%d").ok());
+        
         results
             .into_iter()
             .map(|mut location| {
-                location.slots.retain(|slot| slot.availability);
+                location.slots.retain(|slot| {
+                    if !slot.availability {
+                        return false;
+                    }
+                    // Apply date filter if configured
+                    // start_time format is "DD/MM/YYYY HH:MM"
+                    if let Some(date_str) = slot.start_time.split(' ').next() {
+                        if let Ok(slot_date) = NaiveDate::parse_from_str(date_str, "%d/%m/%Y") {
+                            if let Some(start) = start_date {
+                                if slot_date < start {
+                                    return false;
+                                }
+                            }
+                            if let Some(end) = end_date {
+                                if slot_date > end {
+                                    return false;
+                                }
+                            }
+                        }
+                    }
+                    true
+                });
                 location
             })
             .collect()
@@ -119,8 +146,8 @@ impl BookingManager {
         *data_guard = (cloned_results, new_hash_data);
     }
 
-    pub fn update_data(mut new_results: Vec<LocationBookings>) {
-        new_results = Self::clean_data(new_results);
+    pub fn update_data(mut new_results: Vec<LocationBookings>, settings: &Settings) {
+        new_results = Self::clean_data(new_results, settings);
         let updated_data = BookingData {
             results: new_results,
             last_updated: Some(chrono::Utc::now().to_rfc3339()),
@@ -130,6 +157,27 @@ impl BookingManager {
 
         let mut data_guard = get_booking_data().write().unwrap();
         *data_guard = (updated_data, hash);
+    }
+    
+    /// Merge a single location result into existing data (for incremental updates)
+    pub fn merge_location_data(location_booking: LocationBookings, settings: &Settings) {
+        let cleaned = Self::clean_data(vec![location_booking], settings);
+        if cleaned.is_empty() {
+            return;
+        }
+        let location_booking = cleaned.into_iter().next().unwrap();
+        
+        let mut data_guard = get_booking_data().write().unwrap();
+        
+        // Remove existing data for this location
+        data_guard.0.results.retain(|loc| loc.location != location_booking.location);
+        
+        // Add new data
+        data_guard.0.results.push(location_booking);
+        data_guard.0.last_updated = Some(chrono::Utc::now().to_rfc3339());
+        
+        // Update hash
+        data_guard.1 = data_guard.0.calculate_hash();
     }
 
     pub fn start_background_updates(locations: Vec<String>, file_path: String, settings: Settings) {
@@ -163,8 +211,9 @@ impl BookingManager {
     pub async fn perform_update(locations: Vec<String>, file_path: &str, settings: Settings) {
         let start_time = Instant::now();
         let max_retries = settings.retries;
+        let total_locations = locations.len();
 
-        let mut final_results: HashMap<String, LocationBookings> = HashMap::new();
+        let mut scraped_count = 0usize;
         let mut remaining_locations = locations.clone();
 
         for attempt in 1..=max_retries {
@@ -180,20 +229,30 @@ impl BookingManager {
                 remaining_locations.len()
             );
 
-            match super::rta::scrape_rta_timeslots(remaining_locations.clone(), &settings).await {
-                Ok(result_map) => {
+            match super::rta::scrape_rta_timeslots_incremental(
+                remaining_locations.clone(), 
+                &settings,
+                file_path,
+                |location_booking, fp| {
+                    // Callback for each successfully scraped location
+                    Self::merge_location_data(location_booking, &settings);
+                    
+                    // Save incrementally after each location
+                    if let Err(e) = Self::save_to_file(fp) {
+                        eprintln!("WARN: Failed to save incremental update: {}", e);
+                    }
+                }
+            ).await {
+                Ok(successful_locations) => {
                     println!(
                         "INFO: Successfully scraped {}/{} locations in attempt {}.",
-                        result_map.len(),
+                        successful_locations.len(),
                         remaining_locations.len(),
                         attempt
                     );
 
-                    for (k, v) in result_map {
-                        final_results.insert(k.to_string(), v);
-                    }
-
-                    remaining_locations.retain(|loc| !final_results.contains_key(loc));
+                    scraped_count += successful_locations.len();
+                    remaining_locations.retain(|loc| !successful_locations.contains(loc));
 
                     if remaining_locations.is_empty() {
                         println!(
@@ -220,13 +279,12 @@ impl BookingManager {
                             remaining_locations.len(),
                             max_retries
                         );
-                        if final_results.is_empty() {
-                            eprintln!("ERROR: No data was successfully scraped. No update will be performed.");
-                            return;
+                        if scraped_count == 0 {
+                            eprintln!("ERROR: No data was successfully scraped.");
                         } else {
                             eprintln!(
                                 "WARNING: Partial data collected. Successfully scraped {}/{} locations.",
-                                final_results.len(), locations.len()
+                                scraped_count, total_locations
                             );
                         }
                     }
@@ -238,11 +296,7 @@ impl BookingManager {
             }
         }
 
-        if !final_results.is_empty() {
-            let all_results: Vec<LocationBookings> = final_results.into_values().collect();
-            Self::update_data(all_results);
-        }
-
+        // Final save to ensure everything is persisted
         if let Err(e) = Self::save_to_file(file_path) {
             eprintln!(
                 "ERROR: Failed to save booking data to file '{}': {}",
@@ -255,11 +309,12 @@ impl BookingManager {
         let seconds = elapsed.as_secs() % 60;
         let millis = elapsed.subsec_millis();
         println!(
-            "INFO: Total scraping time across all attempts: {}m {}s {}ms ({} locations)",
+            "INFO: Total scraping time: {}m {}s {}ms ({}/{} locations)",
             minutes,
             seconds,
             millis,
-            locations.len()
+            scraped_count,
+            total_locations
         );
     }
 }

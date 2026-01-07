@@ -16,11 +16,21 @@ pub struct Settings {
     pub selenium_element_polling: u64,
     pub retries: u64,
     pub scrape_refresh_time_min: u64,
+    #[serde(default)]
+    pub locations: Vec<String>,
+    #[serde(default)]
+    pub date_filter_start: Option<String>,
+    #[serde(default)]
+    pub date_filter_end: Option<String>,
 }
 
 impl Settings {
     pub fn from_yaml<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
-        dotenv().ok();
+        // Load .env from current directory
+        match dotenv() {
+            Ok(path) => println!("INFO: Loaded .env from {:?}", path),
+            Err(e) => eprintln!("WARN: Could not load .env file: {}", e),
+        }
 
         let mut file = File::open(path)?;
         let mut contents = String::new();
@@ -30,6 +40,10 @@ impl Settings {
 
         settings.username = parse_env_var(&settings.username)?;
         settings.password = parse_env_var(&settings.password)?;
+        
+        // Debug: show credential lengths (not values)
+        println!("INFO: Credentials loaded - username: {} chars, password: {} chars", 
+            settings.username.len(), settings.password.len());
 
         Ok(settings)
     }
