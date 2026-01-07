@@ -19,6 +19,7 @@ pub fn LocationRow(
     loc: crate::data::location::Location,
     distance: f64,
     earliest_slot: Option<TimeSlot>,
+    latest_slot: Option<TimeSlot>,
     is_loading: ReadSignal<bool>,
 ) -> impl IntoView {
     let (expanded, set_expanded) = create_signal(false);
@@ -53,6 +54,21 @@ pub fn LocationRow(
                                 view! { <span class="text-gray-400">Loading...</span> }.into_any()
                             } else {
                                 view! { <span class="text-gray-400">No availability</span> }.into_any()
+                            }
+                        }
+                    }}
+                </td>
+
+                <td class="px-1 py-3 md:px-3 md:py-3 whitespace-nowrap text-sm text-gray-500">
+                    {match latest_slot {
+                        Some(slot) => view! {
+                            <span class="text-orange-600 font-medium">{slot.start_time}</span>
+                        }.into_any(),
+                        None => {
+                            if is_loading.get_untracked() {
+                                view! { <span class="text-gray-400">Loading...</span> }.into_any()
+                            } else {
+                                view! { <span class="text-gray-400">-</span> }.into_any()
                             }
                         }
                     }}

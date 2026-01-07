@@ -21,6 +21,7 @@ enum SortColumn {
     Name,
     Distance,
     EarliestSlot,
+    LatestSlot,
     PassRate,
 }
 
@@ -89,8 +90,8 @@ pub fn LocationsTable(
         bookings
             .get()
             .into_iter()
-            .map(|booking| (booking.location.clone(), booking.earliest_slot))
-            .collect::<HashMap<String, Option<TimeSlot>>>()
+            .map(|booking| (booking.location.clone(), (booking.earliest_slot, booking.latest_slot)))
+            .collect::<HashMap<String, (Option<TimeSlot>, Option<TimeSlot>)>>()
     });
 
     let (sort_column, set_sort_column) = create_signal(SortColumn::Distance);
@@ -128,8 +129,11 @@ pub fn LocationsTable(
             .into_iter()
             .map(|(loc, distance)| {
                 let location_id = loc.id.to_string();
-                let earliest_slot = booking_data.get(&location_id).cloned().flatten();
-                (loc, distance, earliest_slot)
+                let (earliest_slot, latest_slot) = booking_data
+                    .get(&location_id)
+                    .cloned()
+                    .unwrap_or((None, None));
+                (loc, distance, earliest_slot, latest_slot)
             })
             .collect();
 
@@ -138,6 +142,12 @@ pub fn LocationsTable(
                 SortColumn::Name => a.0.name.cmp(&b.0.name),
                 SortColumn::Distance => a.1.total_cmp(&b.1),
                 SortColumn::EarliestSlot => match (&a.2, &b.2) {
+                    (Some(slot_a), Some(slot_b)) => slot_a.cmp(&slot_b),
+                    (Some(_), None) => std::cmp::Ordering::Less,
+                    (None, Some(_)) => std::cmp::Ordering::Greater,
+                    (None, None) => std::cmp::Ordering::Equal,
+                },
+                SortColumn::LatestSlot => match (&a.3, &b.3) {
                     (Some(slot_a), Some(slot_b)) => slot_a.cmp(&slot_b),
                     (Some(_), None) => std::cmp::Ordering::Less,
                     (None, Some(_)) => std::cmp::Ordering::Greater,
@@ -179,11 +189,12 @@ pub fn LocationsTable(
             <div class="overflow-x-auto">
                 <table class="min-w-full bg-white border border-gray-200 rounded-lg overflow-hidden table-fixed">
                     <colgroup>
-                        <col style="width: 15%;" />
-                        <col style="width: 12%;" />
-                        <col style="width: 28%;" />
-                        <col style="width: 15%;" />
+                        <col style="width: 14%;" />
                         <col style="width: 10%;" />
+                        <col style="width: 22%;" />
+                        <col style="width: 22%;" />
+                        <col style="width: 12%;" />
+                        <col style="width: 8%;" />
                     </colgroup>
                     <thead class="bg-gray-50">
                         <tr>
@@ -209,7 +220,15 @@ pub fn LocationsTable(
                                 sort_direction=sort_direction
                                 on_sort=handle_sort_click
                                 title="Earliest Slot"
-                                mobile_title=Some("Slot")
+                                mobile_title=Some("Early")
+                            />
+                            <SortableHeader
+                                column=SortColumn::LatestSlot
+                                current_sort=sort_column
+                                sort_direction=sort_direction
+                                on_sort=handle_sort_click
+                                title="Latest Slot"
+                                mobile_title=Some("Late")
                             />
                             <SortableHeader
                                 column=SortColumn::PassRate
@@ -228,12 +247,13 @@ pub fn LocationsTable(
                         {move || {
                             let locations_data = sorted_locations.get();
 
-                            locations_data.into_iter().map(|(loc, distance, earliest_slot)| {
+                            locations_data.into_iter().map(|(loc, distance, earliest_slot, latest_slot)| {
                                 view! {
                                     <LocationRow
                                         loc=loc
                                         distance=distance
                                         earliest_slot=earliest_slot
+                                        latest_slot=latest_slot
                                         is_loading=is_loading
                                     />
                                 }

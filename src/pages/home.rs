@@ -17,6 +17,7 @@ use crate::utils::geocoding::geocode_address;
 pub struct LocationBookingViewModel {
     pub location: String,
     pub earliest_slot: Option<TimeSlot>,
+    pub latest_slot: Option<TimeSlot>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -54,16 +55,28 @@ pub async fn get_location_bookings(
         .results
         .iter()
         .map(|location_booking| {
-            let earliest_slot = location_booking
+            let available_slots: Vec<_> = location_booking
                 .slots
                 .iter()
                 .filter(|slot| slot.availability)
-                .min_by(|a, b| a.start_time.cmp(&b.start_time))
+                .collect();
+            
+            let earliest_slot = available_slots
+                .iter()
+                .min_by(|a, b| a.cmp(b))
+                .cloned()
+                .cloned();
+            
+            let latest_slot = available_slots
+                .iter()
+                .max_by(|a, b| a.cmp(b))
+                .cloned()
                 .cloned();
 
             LocationBookingViewModel {
                 location: location_booking.location.clone(),
                 earliest_slot,
+                latest_slot,
             }
         })
         .collect();
