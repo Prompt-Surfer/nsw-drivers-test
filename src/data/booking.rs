@@ -549,6 +549,9 @@ impl BookingManager {
             );
         }
 
+        // Check for alerts after scraping
+        Self::check_and_notify_alerts(&settings);
+
         let elapsed = start_time.elapsed();
         let duration_secs = elapsed.as_secs();
         
@@ -565,5 +568,45 @@ impl BookingManager {
             scraped_count,
             total_locations
         );
+    }
+
+    /// Check available slots against alert configurations and send notifications
+    pub fn check_and_notify_alerts(settings: &Settings) {
+        use crate::data::location::LocationManager;
+        use crate::notifications::NotificationManager;
+
+        if !settings.alerts_enabled || settings.alerts.is_empty() {
+            return;
+        }
+
+        let location_manager = LocationManager::new();
+        let data_guard = get_booking_data().read().unwrap();
+        
+        // Build available slots with location names
+        let available_slots: Vec<_> = data_guard.0.results
+            .iter()
+            .map(|loc| {
+                let location_name = location_manager
+                    .get_by_id(loc.location.parse().unwrap_or(0))
+                    .map(|l| l.name.clone())
+                    .unwrap_or_else(|| loc.location.clone());
+                (loc.location.clone(), location_name, loc.slots.clone())
+            })
+            .collect();
+
+        // Check for matches
+        let matches = NotificationManager::check_for_matches(&settings.alerts, &available_slots);
+        
+        if !matches.is_empty() {
+            println!("INFO: Found {} matching slots for alerts", matches.len());
+            
+            // Process and get new alerts
+            let new_alerts = NotificationManager::process_matches(matches);
+            
+            if !new_alerts.is_empty() {
+                println!("INFO: Sending {} new notifications", new_alerts.len());
+                NotificationManager::notify_new_alerts(&new_alerts);
+            }
+        }
     }
 }
