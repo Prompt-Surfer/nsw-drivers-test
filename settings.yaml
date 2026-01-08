@@ -93,3 +93,4 @@ alerts:
   - 5
   - 6
 alerts_enabled: true
+parallel_workers: 3parallel_workers: 3

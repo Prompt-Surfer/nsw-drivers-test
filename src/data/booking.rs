@@ -29,6 +29,7 @@ pub struct ScrapingStatus {
     pub error_message: Option<String>,
     pub last_completed_at: Option<String>,
     pub last_duration_secs: Option<u64>,
+    pub active_workers: u8,
 }
 
 fn get_scraping_status() -> &'static Arc<RwLock<ScrapingStatus>> {
@@ -244,6 +245,8 @@ impl BookingManager {
             return Err("Scraping is already in progress".to_string());
         }
         
+        let num_workers = settings.parallel_workers;
+        
         // Initialize status
         Self::update_scraping_status(|status| {
             status.is_running = true;
@@ -253,6 +256,7 @@ impl BookingManager {
             status.total_locations = locations.len();
             status.estimated_remaining_secs = Self::calculate_remaining_estimate(&locations);
             status.error_message = None;
+            status.active_workers = num_workers;
         });
         
         tokio::spawn(async move {
@@ -328,9 +332,15 @@ impl BookingManager {
         let start_time = Instant::now();
         let max_retries = settings.retries;
         let total_locations = locations.len();
+        let num_workers = settings.parallel_workers;
 
         let mut scraped_count = 0usize;
         let mut remaining_locations = locations.clone();
+
+        println!(
+            "INFO: Starting scrape with {} parallel worker(s) for {} locations",
+            num_workers, total_locations
+        );
 
         for attempt in 1..=max_retries {
             if remaining_locations.is_empty() {
@@ -345,7 +355,7 @@ impl BookingManager {
                 remaining_locations.len()
             );
 
-            match super::rta::scrape_rta_timeslots_incremental(
+            match super::rta::scrape_rta_parallel(
                 remaining_locations.clone(), 
                 &settings,
                 file_path,
@@ -436,14 +446,18 @@ impl BookingManager {
     
     /// Perform update with status tracking for UI
     pub async fn perform_update_with_tracking(locations: Vec<String>, file_path: &str, settings: Settings) {
-        use std::time::Instant as StdInstant;
-        
         let start_time = Instant::now();
         let max_retries = settings.retries;
         let total_locations = locations.len();
+        let num_workers = settings.parallel_workers;
 
         let mut scraped_count = 0usize;
         let mut remaining_locations = locations.clone();
+
+        println!(
+            "INFO: Starting scrape with {} parallel worker(s) for {} locations",
+            num_workers, total_locations
+        );
 
         for attempt in 1..=max_retries {
             if remaining_locations.is_empty() {
@@ -458,11 +472,6 @@ impl BookingManager {
                 remaining_locations.len()
             );
 
-            // Track timing per location
-            let location_start_times: std::sync::Arc<std::sync::Mutex<HashMap<String, StdInstant>>> = 
-                std::sync::Arc::new(std::sync::Mutex::new(HashMap::new()));
-            
-            let times_clone = location_start_times.clone();
             let settings_clone = settings.clone();
             
             // Update status before starting
@@ -471,19 +480,12 @@ impl BookingManager {
                 status.estimated_remaining_secs = Self::calculate_remaining_estimate(&remaining_locations);
             });
 
-            match super::rta::scrape_rta_timeslots_incremental(
+            match super::rta::scrape_rta_parallel(
                 remaining_locations.clone(), 
                 &settings,
                 file_path,
                 move |location_booking, fp| {
                     let location = location_booking.location.clone();
-                    
-                    // Record timing for this location
-                    let mut times = times_clone.lock().unwrap();
-                    if let Some(start) = times.remove(&location) {
-                        let duration = start.elapsed().as_secs();
-                        Self::record_location_time(&location, duration);
-                    }
                     
                     // Merge data
                     Self::merge_location_data(location_booking, &settings_clone);
