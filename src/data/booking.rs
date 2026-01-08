@@ -26,6 +26,8 @@ pub struct ScrapingStatus {
     pub estimated_remaining_secs: Option<u64>,
     pub current_location_start_time: Option<u64>,
     pub error_message: Option<String>,
+    pub last_completed_at: Option<String>,
+    pub last_duration_secs: Option<u64>,
 }
 
 fn get_scraping_status() -> &'static Arc<RwLock<ScrapingStatus>> {
@@ -548,10 +550,18 @@ impl BookingManager {
         }
 
         let elapsed = start_time.elapsed();
+        let duration_secs = elapsed.as_secs();
+        
+        // Update status with completion info
+        Self::update_scraping_status(|status| {
+            status.last_completed_at = Some(chrono::Utc::now().to_rfc3339());
+            status.last_duration_secs = Some(duration_secs);
+        });
+        
         println!(
             "INFO: Total scraping time: {}m {}s ({}/{} locations)",
-            elapsed.as_secs() / 60,
-            elapsed.as_secs() % 60,
+            duration_secs / 60,
+            duration_secs % 60,
             scraped_count,
             total_locations
         );

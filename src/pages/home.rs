@@ -21,6 +21,8 @@ pub struct ScrapingStatusResponse {
     pub total_count: usize,
     pub estimated_remaining_secs: Option<u64>,
     pub error_message: Option<String>,
+    pub last_completed_at: Option<String>,
+    pub last_duration_secs: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -173,6 +175,8 @@ pub async fn get_scraping_status() -> Result<ScrapingStatusResponse, ServerFnErr
         total_count: status.total_locations,
         estimated_remaining_secs: status.estimated_remaining_secs,
         error_message: status.error_message,
+        last_completed_at: status.last_completed_at,
+        last_duration_secs: status.last_duration_secs,
     })
 }
 
@@ -378,10 +382,47 @@ pub fn HomePage() -> impl IntoView {
                     <div class="mb-3 text-sm text-blue-600">{msg}</div>
                 })}
                 
-                // Progress bar (shown when scraping is running)
+                // Progress bar with three states: idle, running, completed
                 {move || {
                     let status = scraping_status.get();
-                    if status.is_running || status.total_count > 0 {
+                    
+                    // State C: Completed (not running, but has completion info)
+                    if !status.is_running && status.last_completed_at.is_some() {
+                        let duration_text = status.last_duration_secs.map(|secs| {
+                            let mins = secs / 60;
+                            let secs_rem = secs % 60;
+                            if mins > 0 {
+                                format!("Total time: {}m {}s", mins, secs_rem)
+                            } else {
+                                format!("Total time: {}s", secs_rem)
+                            }
+                        }).unwrap_or_default();
+                        
+                        view! {
+                            <div class="space-y-2">
+                                <div class="flex justify-between text-sm">
+                                    <span class="text-green-600 font-medium flex items-center gap-1">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                                        </svg>
+                                        "Scraping completed!"
+                                    </span>
+                                    <span class="text-gray-600">{duration_text}</span>
+                                </div>
+                                <div class="w-full bg-gray-200 rounded-full h-3">
+                                    <div class="bg-green-500 h-3 rounded-full w-full"></div>
+                                </div>
+                                <div class="text-sm text-gray-500">
+                                    {format!("Successfully scraped {}/{} locations", status.completed_count, status.total_count)}
+                                </div>
+                                {status.error_message.clone().map(|err| view! {
+                                    <div class="text-sm text-red-600">{err}</div>
+                                })}
+                            </div>
+                        }.into_any()
+                    }
+                    // State B: Currently running
+                    else if status.is_running {
                         let progress = if status.total_count > 0 {
                             (status.completed_count as f64 / status.total_count as f64 * 100.0) as u32
                         } else {
@@ -390,11 +431,11 @@ pub fn HomePage() -> impl IntoView {
                         
                         let eta_text = status.estimated_remaining_secs.map(|secs| {
                             let mins = secs / 60;
-                            let secs = secs % 60;
+                            let secs_rem = secs % 60;
                             if mins > 0 {
-                                format!("~{}m {}s remaining", mins, secs)
+                                format!("~{}m {}s remaining", mins, secs_rem)
                             } else {
-                                format!("~{}s remaining", secs)
+                                format!("~{}s remaining", secs_rem)
                             }
                         }).unwrap_or_else(|| "Calculating...".to_string());
                         
@@ -402,28 +443,34 @@ pub fn HomePage() -> impl IntoView {
                             <div class="space-y-2">
                                 <div class="flex justify-between text-sm text-gray-600">
                                     <span>
-                                        {move || format!("Progress: {}/{} locations", status.completed_count, status.total_count)}
+                                        {format!("Progress: {}/{} locations", status.completed_count, status.total_count)}
                                     </span>
                                     <span>{eta_text}</span>
                                 </div>
                                 <div class="w-full bg-gray-200 rounded-full h-3">
                                     <div 
                                         class="bg-green-500 h-3 rounded-full transition-all duration-500"
-                                        style=move || format!("width: {}%", progress)
+                                        style=format!("width: {}%", progress)
                                     ></div>
                                 </div>
-                                {status.current_location.map(|loc| view! {
+                                {status.current_location.clone().map(|loc| view! {
                                     <div class="text-sm text-gray-500">
                                         "Currently scraping: " <span class="font-medium">{loc}</span>
                                     </div>
                                 })}
-                                {status.error_message.map(|err| view! {
+                                {status.error_message.clone().map(|err| view! {
                                     <div class="text-sm text-red-600">{err}</div>
                                 })}
                             </div>
                         }.into_any()
-                    } else {
-                        view! { <div class="text-sm text-gray-500">No scraping in progress. Click "Start Scraping" to begin.</div> }.into_any()
+                    }
+                    // State A: Idle (never ran or reset)
+                    else {
+                        view! { 
+                            <div class="text-sm text-gray-500">
+                                "No scraping in progress. Click \"Start Scraping\" to begin."
+                            </div> 
+                        }.into_any()
                     }
                 }}
             </div>
