@@ -22,3 +22,11 @@ locations:
 # Date range filter (slots outside this range will be excluded)
 date_filter_start: "2026-02-01"
 date_filter_end: "2026-09-30"
+
+# Alert settings
+alerts_enabled: true
+alerts:
+  - location_id: "621"
+    location_name: "North Rocks"
+    enabled: true
+    months: [3, 4, 5, 6]  # March to June

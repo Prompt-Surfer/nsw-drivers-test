@@ -10,6 +10,7 @@ use web_sys::wasm_bindgen::prelude::Closure;
 use crate::data::location::LocationManager;
 use crate::data::shared_booking::TimeSlot;
 use crate::pages::location_table::LocationsTable;
+use crate::settings::AlertConfig;
 use crate::utils::date::TimeDisplay;
 use crate::utils::geocoding::geocode_address;
 
@@ -46,6 +47,26 @@ pub struct LocationDetailBookingResponse {
     pub etag: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct AlertSettingsResponse {
+    pub alerts_enabled: bool,
+    pub alerts: Vec<AlertConfig>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SlotAlertResponse {
+    pub location_id: String,
+    pub location_name: String,
+    pub slot_time: String,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LocationOption {
+    pub id: String,
+    pub name: String,
+}
+
 #[server(GetBookings)]
 pub async fn get_location_bookings(
     client_etag: String,
@@ -58,8 +79,6 @@ pub async fn get_location_bookings(
 
     let (booking_data, server_etag) = BookingManager::get_data();
     if client_etag == server_etag {
-        // WARN: for some reason this makes it open in hte browser
-        // response.set_status(StatusCode::NOT_MODIFIED);
         return Ok(None);
     }
 
@@ -112,8 +131,6 @@ pub async fn get_location_details(
     )?;
 
     if client_etag == server_etag {
-        // WARN: for some reason this makes it open in hte browser
-        // response.set_status(StatusCode::NOT_MODIFIED);
         return Ok(None);
     }
 
@@ -135,8 +152,8 @@ pub async fn start_scraping() -> Result<String, ServerFnError> {
     let settings = Settings::from_yaml("settings.yaml")
         .map_err(|e| ServerFnError::<NoCustomError>::ServerError(format!("Failed to load settings: {}", e)))?;
     
-    // Get locations from settings or load all
-    let locations = if settings.locations.is_empty() {
+    // Use get_scrape_locations which respects alert settings
+    let locations = if settings.get_scrape_locations().is_empty() {
         // Load all locations from centres.json
         let mut file = File::open("data/centres.json")
             .map_err(|e| ServerFnError::<NoCustomError>::ServerError(format!("Failed to open centres.json: {}", e)))?;
@@ -147,7 +164,7 @@ pub async fn start_scraping() -> Result<String, ServerFnError> {
             .map_err(|e| ServerFnError::<NoCustomError>::ServerError(format!("Failed to parse centres.json: {}", e)))?;
         locs.into_iter().map(|l| l.id.to_string()).collect()
     } else {
-        settings.locations.clone()
+        settings.get_scrape_locations()
     };
     
     let count = locations.len();
@@ -180,6 +197,355 @@ pub async fn get_scraping_status() -> Result<ScrapingStatusResponse, ServerFnErr
     })
 }
 
+#[server(GetAlertSettings)]
+pub async fn get_alert_settings() -> Result<AlertSettingsResponse, ServerFnError> {
+    use crate::settings::Settings;
+    
+    let settings = Settings::from_yaml("settings.yaml")
+        .map_err(|e| ServerFnError::<NoCustomError>::ServerError(format!("Failed to load settings: {}", e)))?;
+    
+    Ok(AlertSettingsResponse {
+        alerts_enabled: settings.alerts_enabled,
+        alerts: settings.alerts,
+    })
+}
+
+#[server(SaveAlertSettings)]
+pub async fn save_alert_settings(
+    alerts_enabled: bool,
+    alerts: Vec<AlertConfig>,
+) -> Result<(), ServerFnError> {
+    use crate::settings::Settings;
+    use crate::notifications::NotificationManager;
+    
+    let mut settings = Settings::from_yaml("settings.yaml")
+        .map_err(|e| ServerFnError::<NoCustomError>::ServerError(format!("Failed to load settings: {}", e)))?;
+    
+    settings.alerts_enabled = alerts_enabled;
+    settings.alerts = alerts;
+    
+    // Update locations to match enabled alerts when alerts are enabled
+    if alerts_enabled {
+        settings.locations = settings.alerts
+            .iter()
+            .filter(|a| a.enabled)
+            .map(|a| a.location_id.clone())
+            .collect();
+    }
+    
+    settings.save_to_yaml("settings.yaml")
+        .map_err(|e| ServerFnError::<NoCustomError>::ServerError(format!("Failed to save settings: {}", e)))?;
+    
+    // Clear notification history when settings change
+    NotificationManager::clear_notification_history();
+    
+    Ok(())
+}
+
+#[server(GetActiveAlerts)]
+pub async fn get_active_alerts() -> Result<Vec<SlotAlertResponse>, ServerFnError> {
+    use crate::notifications::NotificationManager;
+    
+    let alerts = NotificationManager::get_active_alerts();
+    
+    Ok(alerts.into_iter().map(|a| SlotAlertResponse {
+        location_id: a.location_id,
+        location_name: a.location_name,
+        slot_time: a.slot_time,
+        created_at: a.created_at,
+    }).collect())
+}
+
+#[server(DismissAlert)]
+pub async fn dismiss_alert(location_id: String, slot_time: String) -> Result<(), ServerFnError> {
+    use crate::notifications::NotificationManager;
+    
+    NotificationManager::dismiss_alert(&location_id, &slot_time);
+    Ok(())
+}
+
+#[server(DismissAllAlerts)]
+pub async fn dismiss_all_alerts() -> Result<(), ServerFnError> {
+    use crate::notifications::NotificationManager;
+    
+    NotificationManager::dismiss_all_alerts();
+    Ok(())
+}
+
+#[server(GetAllLocations)]
+pub async fn get_all_locations() -> Result<Vec<LocationOption>, ServerFnError> {
+    use crate::data::location::LocationManager;
+    
+    let manager = LocationManager::new();
+    let locations = manager.get_all();
+    
+    Ok(locations.into_iter().map(|l| LocationOption {
+        id: l.id.to_string(),
+        name: l.name,
+    }).collect())
+}
+
+const MONTHS: [&str; 12] = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+#[component]
+pub fn AlertBanner(
+    alerts: ReadSignal<Vec<SlotAlertResponse>>,
+    on_dismiss: impl Fn(String, String) + 'static + Copy + Send + Sync,
+    on_dismiss_all: impl Fn() + 'static + Copy + Send + Sync,
+) -> impl IntoView {
+    view! {
+        {move || {
+            let current_alerts = alerts.get();
+            if current_alerts.is_empty() {
+                view! { <div class="hidden"></div> }.into_any()
+            } else {
+                view! {
+                    <div class="mb-6 p-4 bg-amber-50 border-2 border-amber-400 rounded-lg">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-lg font-semibold text-amber-800 flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                                </svg>
+                                "🚗 Slots Available!"
+                            </h3>
+                            <button
+                                class="text-sm text-amber-600 hover:text-amber-800 underline"
+                                on:click=move |_| on_dismiss_all()
+                            >
+                                "Dismiss All"
+                            </button>
+                        </div>
+                        <div class="space-y-2">
+                            {current_alerts.into_iter().map(|alert| {
+                                let loc_id = alert.location_id.clone();
+                                let slot = alert.slot_time.clone();
+                                view! {
+                                    <div class="flex items-center justify-between bg-white p-3 rounded border border-amber-200">
+                                        <div>
+                                            <span class="font-medium text-amber-900">{alert.location_name}</span>
+                                            <span class="text-amber-700 ml-2">{alert.slot_time}</span>
+                                        </div>
+                                        <button
+                                            class="text-amber-500 hover:text-amber-700"
+                                            on:click=move |_| on_dismiss(loc_id.clone(), slot.clone())
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                                <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                }
+                            }).collect::<Vec<_>>()}
+                        </div>
+                    </div>
+                }.into_any()
+            }
+        }}
+    }
+}
+
+#[component]
+pub fn AlertSettingsPanel(
+    all_locations: ReadSignal<Vec<LocationOption>>,
+    alert_settings: ReadSignal<AlertSettingsResponse>,
+    on_save: impl Fn(bool, Vec<AlertConfig>) + 'static + Copy + Send + Sync,
+) -> impl IntoView {
+    let (is_expanded, set_is_expanded) = create_signal(false);
+    let (local_enabled, set_local_enabled) = create_signal(false);
+    let (local_alerts, set_local_alerts) = create_signal::<Vec<AlertConfig>>(vec![]);
+    let (has_changes, set_has_changes) = create_signal(false);
+
+    // Initialize local state from props
+    Effect::new(move |_| {
+        let settings = alert_settings.get();
+        set_local_enabled(settings.alerts_enabled);
+        set_local_alerts(settings.alerts.clone());
+    });
+
+    let toggle_location = move |location_id: String, location_name: String| {
+        set_local_alerts.update(|alerts| {
+            if let Some(alert) = alerts.iter_mut().find(|a| a.location_id == location_id) {
+                alert.enabled = !alert.enabled;
+            } else {
+                alerts.push(AlertConfig {
+                    location_id,
+                    location_name,
+                    enabled: true,
+                    months: vec![3, 4, 5, 6], // Default to Mar-Jun
+                });
+            }
+        });
+        set_has_changes(true);
+    };
+
+    let toggle_month = move |location_id: String, month: u32| {
+        set_local_alerts.update(|alerts| {
+            if let Some(alert) = alerts.iter_mut().find(|a| a.location_id == location_id) {
+                if alert.months.contains(&month) {
+                    alert.months.retain(|&m| m != month);
+                } else {
+                    alert.months.push(month);
+                    alert.months.sort();
+                }
+            }
+        });
+        set_has_changes(true);
+    };
+
+    let handle_save = move |_| {
+        on_save(local_enabled.get(), local_alerts.get());
+        set_has_changes(false);
+    };
+
+    view! {
+        <div class="mb-6 border border-gray-200 rounded-lg overflow-hidden">
+            <button
+                class="w-full p-4 bg-gray-50 flex items-center justify-between hover:bg-gray-100 transition-colors"
+                on:click=move |_| set_is_expanded.update(|v| *v = !*v)
+            >
+                <div class="flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-600" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
+                    </svg>
+                    <span class="font-semibold text-gray-700">"Alert Settings"</span>
+                    {move || if local_enabled.get() {
+                        view! { <span class="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">"Enabled"</span> }.into_any()
+                    } else {
+                        view! { <span class="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">"Disabled"</span> }.into_any()
+                    }}
+                </div>
+                <svg 
+                    xmlns="http://www.w3.org/2000/svg" 
+                    class="h-5 w-5 text-gray-400 transition-transform"
+                    class:rotate-180=move || is_expanded.get()
+                    viewBox="0 0 20 20" 
+                    fill="currentColor"
+                >
+                    <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                </svg>
+            </button>
+            
+            {move || if is_expanded.get() {
+                view! {
+                    <div class="p-4 bg-white border-t border-gray-200">
+                        // Master toggle
+                        <div class="flex items-center justify-between mb-4 pb-4 border-b border-gray-200">
+                            <div>
+                                <label class="font-medium text-gray-700">"Enable Alerts"</label>
+                                <p class="text-sm text-gray-500">"Get Windows notifications and webpage alerts when slots become available"</p>
+                            </div>
+                            <button
+                                class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+                                class:bg-green-600=move || local_enabled.get()
+                                class:bg-gray-200=move || !local_enabled.get()
+                                on:click=move |_| {
+                                    set_local_enabled.update(|v| *v = !*v);
+                                    set_has_changes(true);
+                                }
+                            >
+                                <span
+                                    class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+                                    class:translate-x-5=move || local_enabled.get()
+                                    class:translate-x-0=move || !local_enabled.get()
+                                ></span>
+                            </button>
+                        </div>
+
+                        // Location selection
+                        <div class="mb-4">
+                            <h4 class="font-medium text-gray-700 mb-2">"Select Locations to Monitor"</h4>
+                            <p class="text-sm text-gray-500 mb-3">"Only selected locations will be scraped and monitored for alerts"</p>
+                            <div class="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-64 overflow-y-auto">
+                                {move || {
+                                    let locations = all_locations.get();
+                                    let alerts = local_alerts.get();
+                                    locations.into_iter().map(|loc| {
+                                        let loc_id = loc.id.clone();
+                                        let loc_name = loc.name.clone();
+                                        let loc_id2 = loc.id.clone();
+                                        let is_enabled = alerts.iter().any(|a| a.location_id == loc_id && a.enabled);
+                                        view! {
+                                            <label class="flex items-center gap-2 p-2 rounded hover:bg-gray-50 cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    class="h-4 w-4 text-green-600 rounded border-gray-300 focus:ring-green-500"
+                                                    checked=is_enabled
+                                                    on:change=move |_| toggle_location(loc_id2.clone(), loc_name.clone())
+                                                />
+                                                <span class="text-sm text-gray-700">{loc.name}</span>
+                                            </label>
+                                        }
+                                    }).collect::<Vec<_>>()
+                                }}
+                            </div>
+                        </div>
+
+                        // Month selection for each enabled location
+                        {move || {
+                            let alerts = local_alerts.get();
+                            let enabled_alerts: Vec<_> = alerts.iter().filter(|a| a.enabled).cloned().collect();
+                            if enabled_alerts.is_empty() {
+                                view! { <div class="hidden"></div> }.into_any()
+                            } else {
+                                view! {
+                                    <div class="mb-4">
+                                        <h4 class="font-medium text-gray-700 mb-2">"Select Months to Monitor"</h4>
+                                        <p class="text-sm text-gray-500 mb-3">"Choose which months to monitor for each location"</p>
+                                        <div class="space-y-3">
+                                            {enabled_alerts.into_iter().map(|alert| {
+                                                let loc_id = alert.location_id.clone();
+                                                view! {
+                                                    <div class="p-3 bg-gray-50 rounded-lg">
+                                                        <div class="font-medium text-gray-700 mb-2">{alert.location_name.clone()}</div>
+                                                        <div class="flex flex-wrap gap-1">
+                                                            {MONTHS.iter().enumerate().map(|(idx, month)| {
+                                                                let month_num = (idx + 1) as u32;
+                                                                let loc_id_clone = loc_id.clone();
+                                                                let is_selected = alert.months.contains(&month_num);
+                                                                view! {
+                                                                    <button
+                                                                        class="px-2 py-1 text-xs rounded transition-colors"
+                                                                        class:bg-green-600=is_selected
+                                                                        class:text-white=is_selected
+                                                                        class:bg-gray-200=!is_selected
+                                                                        class:text-gray-600=!is_selected
+                                                                        class:hover:bg-green-500=is_selected
+                                                                        class:hover:bg-gray-300=!is_selected
+                                                                        on:click=move |_| toggle_month(loc_id_clone.clone(), month_num)
+                                                                    >
+                                                                        {*month}
+                                                                    </button>
+                                                                }
+                                                            }).collect::<Vec<_>>()}
+                                                        </div>
+                                                    </div>
+                                                }
+                                            }).collect::<Vec<_>>()}
+                                        </div>
+                                    </div>
+                                }.into_any()
+                            }
+                        }}
+
+                        // Save button
+                        <div class="flex justify-end pt-4 border-t border-gray-200">
+                            <button
+                                class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                                disabled=move || !has_changes.get()
+                                on:click=handle_save
+                            >
+                                {move || if has_changes.get() { "Save Changes" } else { "Saved" }}
+                            </button>
+                        </div>
+                    </div>
+                }.into_any()
+            } else {
+                view! { <div class="hidden"></div> }.into_any()
+            }}
+        </div>
+    }
+}
+
 #[component]
 pub fn HomePage() -> impl IntoView {
     let (address_input, set_address_input) = create_signal(String::new());
@@ -204,6 +570,11 @@ pub fn HomePage() -> impl IntoView {
     let (scraping_status, set_scraping_status) = create_signal(ScrapingStatusResponse::default());
     let (scraping_message, set_scraping_message) = create_signal::<Option<String>>(None);
     
+    // Alert state
+    let (active_alerts, set_active_alerts) = create_signal::<Vec<SlotAlertResponse>>(vec![]);
+    let (alert_settings, set_alert_settings) = create_signal(AlertSettingsResponse::default());
+    let (all_locations, set_all_locations) = create_signal::<Vec<LocationOption>>(vec![]);
+
     let fetch_scraping_status = move || {
         leptos::task::spawn_local(async move {
             match get_scraping_status().await {
@@ -212,6 +583,45 @@ pub fn HomePage() -> impl IntoView {
                 }
                 Err(e) => {
                     leptos::logging::log!("Error fetching scraping status: {:?}", e);
+                }
+            }
+        });
+    };
+    
+    let fetch_active_alerts = move || {
+        leptos::task::spawn_local(async move {
+            match get_active_alerts().await {
+                Ok(alerts) => {
+                    set_active_alerts(alerts);
+                }
+                Err(e) => {
+                    leptos::logging::log!("Error fetching active alerts: {:?}", e);
+                }
+            }
+        });
+    };
+    
+    let fetch_alert_settings = move || {
+        leptos::task::spawn_local(async move {
+            match get_alert_settings().await {
+                Ok(settings) => {
+                    set_alert_settings(settings);
+                }
+                Err(e) => {
+                    leptos::logging::log!("Error fetching alert settings: {:?}", e);
+                }
+            }
+        });
+    };
+    
+    let fetch_all_locations = move || {
+        leptos::task::spawn_local(async move {
+            match get_all_locations().await {
+                Ok(locations) => {
+                    set_all_locations(locations);
+                }
+                Err(e) => {
+                    leptos::logging::log!("Error fetching locations: {:?}", e);
                 }
             }
         });
@@ -232,15 +642,50 @@ pub fn HomePage() -> impl IntoView {
         });
     };
     
-    // Poll scraping status when page loads
+    let handle_dismiss_alert = move |location_id: String, slot_time: String| {
+        leptos::task::spawn_local(async move {
+            if let Err(e) = dismiss_alert(location_id, slot_time).await {
+                leptos::logging::log!("Error dismissing alert: {:?}", e);
+            }
+            fetch_active_alerts();
+        });
+    };
+    
+    let handle_dismiss_all = move || {
+        leptos::task::spawn_local(async move {
+            if let Err(e) = dismiss_all_alerts().await {
+                leptos::logging::log!("Error dismissing all alerts: {:?}", e);
+            }
+            fetch_active_alerts();
+        });
+    };
+    
+    let handle_save_alert_settings = move |enabled: bool, alerts: Vec<AlertConfig>| {
+        leptos::task::spawn_local(async move {
+            match save_alert_settings(enabled, alerts).await {
+                Ok(_) => {
+                    fetch_alert_settings();
+                }
+                Err(e) => {
+                    leptos::logging::log!("Error saving alert settings: {:?}", e);
+                }
+            }
+        });
+    };
+    
+    // Poll scraping status and alerts when page loads
     #[cfg(not(feature = "ssr"))]
     {
         fetch_scraping_status();
+        fetch_active_alerts();
+        fetch_alert_settings();
+        fetch_all_locations();
         
         Effect::new(move |_| {
             let handle = set_interval_with_handle(
                 move || {
                     fetch_scraping_status();
+                    fetch_active_alerts();
                 },
                 Duration::from_secs(2),
             )
@@ -363,6 +808,20 @@ pub fn HomePage() -> impl IntoView {
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-2xl font-bold text-gray-800">NSW Available Drivers Tests</h2>
             </div>
+
+            // Alert Banner (shows when there are active alerts)
+            <AlertBanner 
+                alerts=active_alerts
+                on_dismiss=handle_dismiss_alert
+                on_dismiss_all=handle_dismiss_all
+            />
+
+            // Alert Settings Panel
+            <AlertSettingsPanel
+                all_locations=all_locations
+                alert_settings=alert_settings
+                on_save=handle_save_alert_settings
+            />
 
             // Scraping Control Panel
             <div class="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
