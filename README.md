@@ -101,9 +101,31 @@ cp .envexample .env
 # Edit with your MyRTA credentials
 ```
 
+## Scripts (Windows PowerShell)
+
+Convenient scripts are provided in the `scripts/` folder:
+
+| Script | Description |
+|--------|-------------|
+| `.\scripts\serve.ps1` | Start the server (loads .env, starts ChromeDriver) |
+| `.\scripts\stop.ps1` | Stop all running processes |
+| `.\scripts\restart.ps1` | Restart the server (stop + serve) |
+| `.\scripts\dev.ps1` | Start in development mode with hot-reload |
+| `.\scripts\build.ps1` | Build the application |
+| `.\scripts\scrape.ps1` | Trigger scraping via API (server must be running) |
+| `.\scripts\status.ps1` | Check scraping status (server must be running) |
+
+```powershell
+# Example usage
+.\scripts\serve.ps1    # Start server
+.\scripts\scrape.ps1   # Trigger scrape
+.\scripts\status.ps1   # Check progress
+.\scripts\stop.ps1     # Stop everything
+```
+
 ## Command Line Guide
 
-### Starting the Application
+### Starting the Application (Manual)
 
 ```bash
 # Start ChromeDriver (required for scraping)
