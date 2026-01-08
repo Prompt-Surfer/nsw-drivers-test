@@ -39,9 +39,15 @@ pub struct Settings {
     pub auto_scrape_enabled: bool,
     #[serde(default = "default_auto_scrape_interval")]
     pub auto_scrape_interval_hours: u32,
+    #[serde(default = "default_parallel_workers")]
+    pub parallel_workers: u8,
 }
 
 fn default_auto_scrape_interval() -> u32 {
+    1
+}
+
+fn default_parallel_workers() -> u8 {
     1
 }
 
@@ -64,6 +70,7 @@ impl Default for Settings {
             alerts_enabled: false,
             auto_scrape_enabled: false,
             auto_scrape_interval_hours: 1,
+            parallel_workers: 1,
         }
     }
 }
