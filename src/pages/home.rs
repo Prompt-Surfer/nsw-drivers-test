@@ -53,6 +53,13 @@ pub struct AlertSettingsResponse {
     pub alerts: Vec<AlertConfig>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct SchedulerStatusResponse {
+    pub enabled: bool,
+    pub interval_hours: u32,
+    pub next_run_at: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SlotAlertResponse {
     pub location_id: String,
@@ -285,6 +292,64 @@ pub async fn get_all_locations() -> Result<Vec<LocationOption>, ServerFnError> {
     }).collect())
 }
 
+#[server(GetSchedulerStatus)]
+pub async fn get_scheduler_status() -> Result<SchedulerStatusResponse, ServerFnError> {
+    use crate::data::booking::BookingManager;
+    
+    let state = BookingManager::get_scheduler_state();
+    
+    Ok(SchedulerStatusResponse {
+        enabled: state.enabled,
+        interval_hours: state.interval_hours,
+        next_run_at: state.next_run_at,
+    })
+}
+
+#[server(SetSchedulerEnabled)]
+pub async fn set_scheduler_state(enabled: bool, interval_hours: u32) -> Result<(), ServerFnError> {
+    use crate::data::booking::BookingManager;
+    use crate::settings::Settings;
+    
+    // Update settings file
+    let mut settings = Settings::from_yaml("settings.yaml")
+        .map_err(|e| ServerFnError::<NoCustomError>::ServerError(format!("Failed to load settings: {}", e)))?;
+    
+    settings.auto_scrape_enabled = enabled;
+    settings.auto_scrape_interval_hours = interval_hours;
+    
+    settings.save_to_yaml("settings.yaml")
+        .map_err(|e| ServerFnError::<NoCustomError>::ServerError(format!("Failed to save settings: {}", e)))?;
+    
+    // Start or stop scheduler
+    if enabled {
+        BookingManager::start_scheduler(interval_hours);
+    } else {
+        BookingManager::stop_scheduler();
+    }
+    
+    Ok(())
+}
+
+#[server(UpdateSchedulerInterval)]
+pub async fn update_scheduler_interval(interval_hours: u32) -> Result<(), ServerFnError> {
+    use crate::data::booking::BookingManager;
+    use crate::settings::Settings;
+    
+    // Update settings file
+    let mut settings = Settings::from_yaml("settings.yaml")
+        .map_err(|e| ServerFnError::<NoCustomError>::ServerError(format!("Failed to load settings: {}", e)))?;
+    
+    settings.auto_scrape_interval_hours = interval_hours;
+    
+    settings.save_to_yaml("settings.yaml")
+        .map_err(|e| ServerFnError::<NoCustomError>::ServerError(format!("Failed to save settings: {}", e)))?;
+    
+    // Update running scheduler
+    BookingManager::update_scheduler_interval(interval_hours);
+    
+    Ok(())
+}
+
 #[component]
 pub fn AlertBanner(
     alerts: ReadSignal<Vec<SlotAlertResponse>>,
@@ -339,6 +404,82 @@ pub fn AlertBanner(
                 }.into_any()
             }
         }}
+    }
+}
+
+#[component]
+pub fn SchedulerControl(
+    scheduler_enabled: ReadSignal<bool>,
+    scheduler_interval: ReadSignal<u32>,
+    next_run_at: ReadSignal<Option<String>>,
+    on_toggle: impl Fn(bool) + 'static + Copy + Send + Sync,
+    on_interval_change: impl Fn(u32) + 'static + Copy + Send + Sync,
+) -> impl IntoView {
+    let interval_options = vec![1, 2, 4, 6, 12, 24];
+    
+    view! {
+        <div class="mt-4 pt-4 border-t border-gray-200">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-600" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd" />
+                    </svg>
+                    <div>
+                        <span class="font-semibold text-gray-700">"Auto Scrape"</span>
+                        <p class="text-sm text-gray-500">"Automatically scrape every X hours"</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <select
+                        class="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                        on:change=move |ev| {
+                            if let Ok(val) = event_target_value(&ev).parse::<u32>() {
+                                on_interval_change(val);
+                            }
+                        }
+                    >
+                        {interval_options.iter().map(|&hours| {
+                            let label = if hours == 1 {
+                                "1 hour".to_string()
+                            } else {
+                                format!("{} hours", hours)
+                            };
+                            view! {
+                                <option 
+                                    value={hours.to_string()} 
+                                    selected=move || scheduler_interval.get() == hours
+                                >
+                                    {label}
+                                </option>
+                            }
+                        }).collect_view()}
+                    </select>
+                    <button
+                        class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+                        class:bg-green-600=move || scheduler_enabled.get()
+                        class:bg-gray-200=move || !scheduler_enabled.get()
+                        on:click=move |_| on_toggle(!scheduler_enabled.get())
+                    >
+                        <span
+                            class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+                            class:translate-x-5=move || scheduler_enabled.get()
+                            class:translate-x-0=move || !scheduler_enabled.get()
+                        ></span>
+                    </button>
+                </div>
+            </div>
+            {move || {
+                if scheduler_enabled.get() {
+                    next_run_at.get().map(|time| view! {
+                        <div class="mt-2 text-sm text-gray-500">
+                            "Next scheduled run: " <span class="font-medium"><TimeDisplay iso_time={time} /></span>
+                        </div>
+                    })
+                } else {
+                    None
+                }
+            }}
+        </div>
     }
 }
 
@@ -411,6 +552,11 @@ pub fn HomePage() -> impl IntoView {
     let (active_alerts, set_active_alerts) = create_signal::<Vec<SlotAlertResponse>>(vec![]);
     let (alerts_enabled, set_alerts_enabled) = create_signal(false);
     let (alert_configs, set_alert_configs) = create_signal::<Vec<AlertConfig>>(vec![]);
+    
+    // Scheduler state
+    let (scheduler_enabled, set_scheduler_enabled) = create_signal(false);
+    let (scheduler_interval, set_scheduler_interval) = create_signal(1u32);
+    let (scheduler_next_run, set_scheduler_next_run) = create_signal::<Option<String>>(None);
 
     let fetch_scraping_status = move || {
         leptos::task::spawn_local(async move {
@@ -447,6 +593,21 @@ pub fn HomePage() -> impl IntoView {
                 }
                 Err(e) => {
                     leptos::logging::log!("Error fetching alert settings: {:?}", e);
+                }
+            }
+        });
+    };
+    
+    let fetch_scheduler_status = move || {
+        leptos::task::spawn_local(async move {
+            match get_scheduler_status().await {
+                Ok(status) => {
+                    set_scheduler_enabled(status.enabled);
+                    set_scheduler_interval(status.interval_hours);
+                    set_scheduler_next_run(status.next_run_at);
+                }
+                Err(e) => {
+                    leptos::logging::log!("Error fetching scheduler status: {:?}", e);
                 }
             }
         });
@@ -530,18 +691,50 @@ pub fn HomePage() -> impl IntoView {
         save_current_settings();
     };
     
+    let handle_toggle_scheduler = move |enabled: bool| {
+        let interval = scheduler_interval.get_untracked();
+        set_scheduler_enabled(enabled);
+        leptos::task::spawn_local(async move {
+            if let Err(e) = set_scheduler_state(enabled, interval).await {
+                leptos::logging::log!("Error toggling scheduler: {:?}", e);
+            }
+            fetch_scheduler_status();
+        });
+    };
+    
+    let handle_scheduler_interval_change = move |interval: u32| {
+        set_scheduler_interval(interval);
+        let enabled = scheduler_enabled.get_untracked();
+        leptos::task::spawn_local(async move {
+            if enabled {
+                // Restart scheduler with new interval
+                if let Err(e) = set_scheduler_state(true, interval).await {
+                    leptos::logging::log!("Error updating scheduler interval: {:?}", e);
+                }
+            } else {
+                // Just save the interval
+                if let Err(e) = update_scheduler_interval(interval).await {
+                    leptos::logging::log!("Error updating scheduler interval: {:?}", e);
+                }
+            }
+            fetch_scheduler_status();
+        });
+    };
+    
     // Poll scraping status and alerts when page loads
     #[cfg(not(feature = "ssr"))]
     {
         fetch_scraping_status();
         fetch_active_alerts();
         fetch_alert_settings();
+        fetch_scheduler_status();
         
         Effect::new(move |_| {
             let handle = set_interval_with_handle(
                 move || {
                     fetch_scraping_status();
                     fetch_active_alerts();
+                    fetch_scheduler_status();
                 },
                 Duration::from_secs(2),
             )
@@ -787,6 +980,15 @@ pub fn HomePage() -> impl IntoView {
                         }.into_any()
                     }
                 }}
+                
+                // Scheduler control
+                <SchedulerControl
+                    scheduler_enabled=scheduler_enabled
+                    scheduler_interval=scheduler_interval
+                    next_run_at=scheduler_next_run
+                    on_toggle=handle_toggle_scheduler
+                    on_interval_change=handle_scheduler_interval_change
+                />
             </div>
 
             <div class="mb-6">

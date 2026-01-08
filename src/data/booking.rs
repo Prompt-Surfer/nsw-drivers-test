@@ -16,6 +16,7 @@ static BOOKING_DATA: OnceLock<Arc<RwLock<(BookingData, String)>>> = OnceLock::ne
 static BACKGROUND_RUNNING: OnceLock<Arc<RwLock<bool>>> = OnceLock::new();
 static SCRAPING_STATUS: OnceLock<Arc<RwLock<ScrapingStatus>>> = OnceLock::new();
 static LOCATION_TIMES: OnceLock<Arc<RwLock<HashMap<String, u64>>>> = OnceLock::new();
+static SCHEDULER_STATE: OnceLock<Arc<RwLock<SchedulerState>>> = OnceLock::new();
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ScrapingStatus {
@@ -31,12 +32,23 @@ pub struct ScrapingStatus {
     pub last_duration_secs: Option<u64>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct SchedulerState {
+    pub enabled: bool,
+    pub interval_hours: u32,
+    pub next_run_at: Option<String>,
+}
+
 fn get_scraping_status() -> &'static Arc<RwLock<ScrapingStatus>> {
     SCRAPING_STATUS.get_or_init(|| Arc::new(RwLock::new(ScrapingStatus::default())))
 }
 
 fn get_location_times() -> &'static Arc<RwLock<HashMap<String, u64>>> {
     LOCATION_TIMES.get_or_init(|| Arc::new(RwLock::new(HashMap::new())))
+}
+
+fn get_scheduler_state() -> &'static Arc<RwLock<SchedulerState>> {
+    SCHEDULER_STATE.get_or_init(|| Arc::new(RwLock::new(SchedulerState::default())))
 }
 
 fn get_booking_data() -> &'static Arc<RwLock<(BookingData, String)>> {
@@ -618,6 +630,122 @@ impl BookingManager {
                 println!("INFO: Sending {} new notifications", new_alerts.len());
                 NotificationManager::notify_new_alerts(&new_alerts);
             }
+        }
+    }
+    
+    /// Get current scheduler state
+    pub fn get_scheduler_state() -> SchedulerState {
+        get_scheduler_state().read().unwrap().clone()
+    }
+    
+    /// Start the automatic scraping scheduler
+    pub fn start_scheduler(interval_hours: u32) {
+        // Update scheduler state
+        {
+            let mut state = get_scheduler_state().write().unwrap();
+            if state.enabled {
+                println!("INFO: Scheduler already running");
+                return;
+            }
+            state.enabled = true;
+            state.interval_hours = interval_hours;
+            let next_run = chrono::Utc::now() + chrono::Duration::hours(interval_hours as i64);
+            state.next_run_at = Some(next_run.to_rfc3339());
+        }
+        
+        println!("INFO: Starting scheduler with interval of {} hours", interval_hours);
+        
+        let interval_secs = interval_hours as u64 * 3600;
+        
+        tokio::spawn(async move {
+            loop {
+                // Wait for the interval
+                tokio::time::sleep(Duration::from_secs(interval_secs)).await;
+                
+                // Check if still enabled
+                {
+                    let state = get_scheduler_state().read().unwrap();
+                    if !state.enabled {
+                        println!("INFO: Scheduler disabled, stopping");
+                        break;
+                    }
+                }
+                
+                // Check if scraping is already running
+                if Self::is_scraping_running() {
+                    println!("INFO: Scraping already in progress, skipping scheduled run");
+                    // Update next run time
+                    {
+                        let mut state = get_scheduler_state().write().unwrap();
+                        let next_run = chrono::Utc::now() + chrono::Duration::hours(state.interval_hours as i64);
+                        state.next_run_at = Some(next_run.to_rfc3339());
+                    }
+                    continue;
+                }
+                
+                // Load settings and start scraping
+                match Settings::from_yaml("settings.yaml") {
+                    Ok(settings) => {
+                        let locations = if settings.get_scrape_locations().is_empty() {
+                            // Load all locations
+                            match std::fs::File::open("data/centres.json") {
+                                Ok(mut file) => {
+                                    let mut contents = String::new();
+                                    if std::io::Read::read_to_string(&mut file, &mut contents).is_ok() {
+                                        serde_json::from_str::<Vec<super::location::Location>>(&contents)
+                                            .map(|locs| locs.into_iter().map(|l| l.id.to_string()).collect())
+                                            .unwrap_or_default()
+                                    } else {
+                                        vec![]
+                                    }
+                                }
+                                Err(_) => vec![]
+                            }
+                        } else {
+                            settings.get_scrape_locations()
+                        };
+                        
+                        if !locations.is_empty() {
+                            println!("INFO: [Scheduler] Starting scheduled scrape for {} locations", locations.len());
+                            
+                            // Trigger the scrape
+                            let _ = Self::trigger_single_scrape(
+                                locations,
+                                "data/bookings.json".to_string(),
+                                settings,
+                            );
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("ERROR: [Scheduler] Failed to load settings: {}", e);
+                    }
+                }
+                
+                // Update next run time
+                {
+                    let mut state = get_scheduler_state().write().unwrap();
+                    let next_run = chrono::Utc::now() + chrono::Duration::hours(state.interval_hours as i64);
+                    state.next_run_at = Some(next_run.to_rfc3339());
+                }
+            }
+        });
+    }
+    
+    /// Stop the automatic scraping scheduler
+    pub fn stop_scheduler() {
+        let mut state = get_scheduler_state().write().unwrap();
+        state.enabled = false;
+        state.next_run_at = None;
+        println!("INFO: Scheduler stopped");
+    }
+    
+    /// Update scheduler interval (requires restart to take effect)
+    pub fn update_scheduler_interval(interval_hours: u32) {
+        let mut state = get_scheduler_state().write().unwrap();
+        state.interval_hours = interval_hours;
+        if state.enabled {
+            let next_run = chrono::Utc::now() + chrono::Duration::hours(interval_hours as i64);
+            state.next_run_at = Some(next_run.to_rfc3339());
         }
     }
 }
