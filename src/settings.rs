@@ -74,10 +74,6 @@ impl Settings {
 
         settings.username = parse_env_var(&settings.username)?;
         settings.password = parse_env_var(&settings.password)?;
-        
-        // Debug: show credential lengths (not values)
-        println!("INFO: Credentials loaded - username: {} chars, password: {} chars", 
-            settings.username.len(), settings.password.len());
 
         Ok(settings)
     }

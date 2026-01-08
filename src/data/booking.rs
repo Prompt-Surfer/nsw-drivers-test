@@ -8,6 +8,7 @@ use std::path::Path;
 use std::sync::{Arc, OnceLock, RwLock};
 use std::time::{Duration, Instant};
 
+use super::location::LocationManager;
 use super::shared_booking::{BookingData, LocationBookings, TimeSlot};
 use crate::settings::Settings;
 
@@ -49,6 +50,15 @@ fn get_background_status() -> &'static Arc<RwLock<bool>> {
 pub struct BookingManager;
 
 impl BookingManager {
+    /// Convert location ID to location name for display
+    fn get_location_name(location_id: &str) -> String {
+        location_id.parse::<u32>()
+            .ok()
+            .and_then(|id| LocationManager::new().get_by_id(id))
+            .map(|loc| loc.name)
+            .unwrap_or_else(|| location_id.to_string())
+    }
+
     pub fn get_data() -> (BookingData, String) {
         get_booking_data().read().unwrap().clone()
     }
@@ -482,7 +492,8 @@ impl BookingManager {
                     Self::update_scraping_status(|status| {
                         status.completed_locations.push(location.clone());
                         status.remaining_locations.retain(|l| l != &location);
-                        status.current_location = status.remaining_locations.first().cloned();
+                        status.current_location = status.remaining_locations.first()
+                            .map(|id| Self::get_location_name(id));
                         status.estimated_remaining_secs = Self::calculate_remaining_estimate(&status.remaining_locations);
                     });
                     

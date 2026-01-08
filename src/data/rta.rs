@@ -9,6 +9,7 @@ use thirtyfour::components::SelectElement;
 use thirtyfour::prelude::*;
 use thirtyfour::{By, DesiredCapabilities, WebDriver};
 
+use super::location::LocationManager;
 use super::shared_booking::{LocationBookings, TimeSlot};
 use crate::settings::Settings;
 
@@ -235,8 +236,15 @@ where
         random_sleep(1000, 2000).await;
     }
 
+    let location_manager = LocationManager::new();
+    
     for (idx, location) in locations.iter().enumerate() {
-        println!("INFO: [{}/{}] Processing location: {}", idx + 1, total, location);
+        let location_name = location.parse::<u32>()
+            .ok()
+            .and_then(|id| location_manager.get_by_id(id))
+            .map(|loc| loc.name.clone())
+            .unwrap_or_else(|| location.clone());
+        println!("INFO: [{}/{}] Processing location: {}", idx + 1, total, location_name);
         
         let process_result: WebDriverResult<LocationBookings> = async {
             random_sleep(1000, 2000).await;

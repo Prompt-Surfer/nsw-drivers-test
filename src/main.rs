@@ -1,34 +1,10 @@
 #![recursion_limit = "512"]
-use std::fs::File;
-use std::io::Read;
-use std::path::Path;
-
 use axum::Router;
 use leptos::prelude::*;
 use leptos_axum::{generate_route_list, LeptosRoutes};
 use nsw_closest_display::app::{shell, App};
 use nsw_closest_display::data::booking::BookingManager;
-use nsw_closest_display::data::location::Location;
 use nsw_closest_display::settings::Settings;
-use serde::Deserialize;
-
-// FIX: HACKY
-fn get_location_names() -> Vec<String> {
-    fn parse_locations() -> Vec<Location> {
-        let mut file = File::open("data/centres.json").unwrap();
-        let mut contents = String::new();
-        file.read_to_string(&mut contents).unwrap();
-        serde_json::from_str(&contents).unwrap_or_else(|e| {
-            log::error!("Failed to parse locations: {}", e);
-            Vec::new()
-        })
-    }
-
-    parse_locations()
-        .into_iter()
-        .map(|location| location.id.to_string())
-        .collect()
-}
 
 #[tokio::main]
 async fn main() {

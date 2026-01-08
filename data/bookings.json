@@ -2988,17 +2988,6 @@
       "next_available_date": null
     },
     {
-      "location": "17",
-      "slots": [
-        {
-          "availability": true,
-          "slot_number": null,
-          "startTime": "12/09/2025 11:15"
-        }
-      ],
-      "next_available_date": "12/09/2025 11:15"
-    },
-    {
       "location": "131",
       "slots": [
         {
@@ -4282,6 +4271,47 @@
       "next_available_date": "10/09/2025 12:15"
     },
     {
+      "location": "621",
+      "slots": [],
+      "next_available_date": null
+    },
+    {
+      "location": "17",
+      "slots": [
+        {
+          "availability": true,
+          "slot_number": null,
+          "startTime": "06/02/2026 11:15"
+        },
+        {
+          "availability": true,
+          "slot_number": null,
+          "startTime": "06/02/2026 12:00"
+        },
+        {
+          "availability": true,
+          "slot_number": null,
+          "startTime": "06/02/2026 12:45"
+        },
+        {
+          "availability": true,
+          "slot_number": null,
+          "startTime": "06/02/2026 13:30"
+        },
+        {
+          "availability": true,
+          "slot_number": null,
+          "startTime": "06/02/2026 14:15"
+        },
+        {
+          "availability": true,
+          "slot_number": null,
+          "startTime": "06/02/2026 15:00"
+        }
+      ],
+      "next_available_date": "06/02/2026 11:15"
+    },
+    {
       "location": "96",
       "slots": [],
       "next_available_date": null
@@ -4297,59 +4327,14 @@
         {
           "availability": true,
           "slot_number": null,
-          "startTime": "18/02/2026 8:30"
-        },
-        {
-          "availability": true,
-          "slot_number": null,
-          "startTime": "18/02/2026 9:15"
-        },
-        {
-          "availability": true,
-          "slot_number": null,
-          "startTime": "19/02/2026 8:30"
-        },
-        {
-          "availability": true,
-          "slot_number": null,
-          "startTime": "19/02/2026 9:15"
-        },
-        {
-          "availability": true,
-          "slot_number": null,
-          "startTime": "19/02/2026 14:30"
-        },
-        {
-          "availability": true,
-          "slot_number": null,
-          "startTime": "19/02/2026 15:15"
-        },
-        {
-          "availability": true,
-          "slot_number": null,
           "startTime": "20/02/2026 8:30"
-        },
-        {
-          "availability": true,
-          "slot_number": null,
-          "startTime": "20/02/2026 14:30"
         }
       ],
-      "next_available_date": "18/02/2026 8:30"
+      "next_available_date": "20/02/2026 8:30"
     },
     {
       "location": "35",
       "slots": [
-        {
-          "availability": true,
-          "slot_number": null,
-          "startTime": "16/02/2026 15:00"
-        },
-        {
-          "availability": true,
-          "slot_number": null,
-          "startTime": "17/02/2026 9:00"
-        },
         {
           "availability": true,
           "slot_number": null,
@@ -4369,16 +4354,6 @@
           "availability": true,
           "slot_number": null,
           "startTime": "18/02/2026 9:00"
-        },
-        {
-          "availability": true,
-          "slot_number": null,
-          "startTime": "18/02/2026 9:45"
-        },
-        {
-          "availability": true,
-          "slot_number": null,
-          "startTime": "18/02/2026 12:15"
         },
         {
           "availability": true,
@@ -4408,22 +4383,12 @@
         {
           "availability": true,
           "slot_number": null,
-          "startTime": "19/02/2026 11:30"
-        },
-        {
-          "availability": true,
-          "slot_number": null,
           "startTime": "19/02/2026 12:15"
         },
         {
           "availability": true,
           "slot_number": null,
           "startTime": "19/02/2026 13:00"
-        },
-        {
-          "availability": true,
-          "slot_number": null,
-          "startTime": "19/02/2026 14:15"
         },
         {
           "availability": true,
@@ -4453,11 +4418,6 @@
         {
           "availability": true,
           "slot_number": null,
-          "startTime": "20/02/2026 11:30"
-        },
-        {
-          "availability": true,
-          "slot_number": null,
           "startTime": "20/02/2026 12:15"
         },
         {
@@ -4476,7 +4436,7 @@
           "startTime": "20/02/2026 15:00"
         }
       ],
-      "next_available_date": "16/02/2026 15:00"
+      "next_available_date": "17/02/2026 14:15"
     },
     {
       "location": "601",
@@ -4489,27 +4449,7 @@
         {
           "availability": true,
           "slot_number": null,
-          "startTime": "23/02/2026 11:45"
-        },
-        {
-          "availability": true,
-          "slot_number": null,
-          "startTime": "23/02/2026 12:30"
-        },
-        {
-          "availability": true,
-          "slot_number": null,
-          "startTime": "23/02/2026 13:15"
-        },
-        {
-          "availability": true,
-          "slot_number": null,
           "startTime": "23/02/2026 14:30"
-        },
-        {
-          "availability": true,
-          "slot_number": null,
-          "startTime": "23/02/2026 15:15"
         },
         {
           "availability": true,
@@ -4520,16 +4460,6 @@
           "availability": true,
           "slot_number": null,
           "startTime": "24/02/2026 9:15"
-        },
-        {
-          "availability": true,
-          "slot_number": null,
-          "startTime": "24/02/2026 11:00"
-        },
-        {
-          "availability": true,
-          "slot_number": null,
-          "startTime": "24/02/2026 11:45"
         },
         {
           "availability": true,
@@ -4565,11 +4495,6 @@
           "availability": true,
           "slot_number": null,
           "startTime": "25/02/2026 10:00"
-        },
-        {
-          "availability": true,
-          "slot_number": null,
-          "startTime": "25/02/2026 11:00"
         },
         {
           "availability": true,
@@ -4672,29 +4597,13 @@
           "startTime": "27/02/2026 15:15"
         }
       ],
-      "next_available_date": "23/02/2026 11:45"
+      "next_available_date": "23/02/2026 14:30"
     },
     {
       "location": "112",
       "slots": [],
       "next_available_date": null
-    },
-    {
-      "location": "621",
-      "slots": [
-        {
-          "availability": true,
-          "slot_number": null,
-          "startTime": "20/02/2026 9:00"
-        },
-        {
-          "availability": true,
-          "slot_number": null,
-          "startTime": "20/02/2026 15:00"
-        }
-      ],
-      "next_available_date": "20/02/2026 9:00"
     }
   ],
-  "last_updated": "2026-01-08T00:48:35.319733100+00:00"
+  "last_updated": "2026-01-08T05:15:21.397419800+00:00"
 }
