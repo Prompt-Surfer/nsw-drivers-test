@@ -2,7 +2,7 @@ headless: false
 username: ${MYRTA_USERNAME}
 password: ${MYRTA_PASSWORD}
 have_booking: false
-selenium_driver_url: http://localhost:57908
+selenium_driver_url: http://localhost:57909
 selenium_element_timout: 20000
 selenium_element_polling: 100
 retries: 4
@@ -11,12 +11,6 @@ locations:
 - '621'
 - '17'
 - '96'
-- '241'
-- '63'
-- '35'
-- '601'
-- '37'
-- '112'
 date_filter_start: 2026-02-01
 date_filter_end: 2026-09-30
 alerts:
@@ -92,5 +86,5 @@ alerts:
   - 4
   - 5
   - 6
-alerts_enabled: true
-parallel_workers: 3parallel_workers: 3
+alerts_enabled: false
+parallel_workers: 3
