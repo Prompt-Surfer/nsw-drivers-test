@@ -13,6 +13,28 @@ use crate::settings::Settings;
 
 static BOOKING_DATA: OnceLock<Arc<RwLock<(BookingData, String)>>> = OnceLock::new();
 static BACKGROUND_RUNNING: OnceLock<Arc<RwLock<bool>>> = OnceLock::new();
+static SCRAPING_STATUS: OnceLock<Arc<RwLock<ScrapingStatus>>> = OnceLock::new();
+static LOCATION_TIMES: OnceLock<Arc<RwLock<HashMap<String, u64>>>> = OnceLock::new();
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ScrapingStatus {
+    pub is_running: bool,
+    pub current_location: Option<String>,
+    pub completed_locations: Vec<String>,
+    pub remaining_locations: Vec<String>,
+    pub total_locations: usize,
+    pub estimated_remaining_secs: Option<u64>,
+    pub current_location_start_time: Option<u64>,
+    pub error_message: Option<String>,
+}
+
+fn get_scraping_status() -> &'static Arc<RwLock<ScrapingStatus>> {
+    SCRAPING_STATUS.get_or_init(|| Arc::new(RwLock::new(ScrapingStatus::default())))
+}
+
+fn get_location_times() -> &'static Arc<RwLock<HashMap<String, u64>>> {
+    LOCATION_TIMES.get_or_init(|| Arc::new(RwLock::new(HashMap::new())))
+}
 
 fn get_booking_data() -> &'static Arc<RwLock<(BookingData, String)>> {
     BOOKING_DATA.get_or_init(|| Arc::new(RwLock::new((BookingData::default(), String::new()))))
@@ -202,10 +224,92 @@ impl BookingManager {
             }
         });
     }
+    
+    /// Trigger a single scraping run (no repeat loop)
+    pub fn trigger_single_scrape(locations: Vec<String>, file_path: String, settings: Settings) -> Result<(), String> {
+        // Check if already running
+        if Self::is_scraping_running() {
+            return Err("Scraping is already in progress".to_string());
+        }
+        
+        // Initialize status
+        Self::update_scraping_status(|status| {
+            status.is_running = true;
+            status.current_location = None;
+            status.completed_locations = vec![];
+            status.remaining_locations = locations.clone();
+            status.total_locations = locations.len();
+            status.estimated_remaining_secs = Self::calculate_remaining_estimate(&locations);
+            status.error_message = None;
+        });
+        
+        tokio::spawn(async move {
+            BookingManager::perform_update_with_tracking(locations, &file_path, settings).await;
+            
+            // Mark as complete
+            Self::update_scraping_status(|status| {
+                status.is_running = false;
+                status.current_location = None;
+            });
+        });
+        
+        Ok(())
+    }
 
     pub fn stop_background_updates() {
         let mut running = get_background_status().write().unwrap();
         *running = false;
+        
+        // Also update scraping status
+        let mut status = get_scraping_status().write().unwrap();
+        status.is_running = false;
+    }
+    
+    pub fn get_scraping_status() -> ScrapingStatus {
+        get_scraping_status().read().unwrap().clone()
+    }
+    
+    pub fn is_scraping_running() -> bool {
+        get_scraping_status().read().unwrap().is_running
+    }
+    
+    fn update_scraping_status(f: impl FnOnce(&mut ScrapingStatus)) {
+        let mut status = get_scraping_status().write().unwrap();
+        f(&mut status);
+    }
+    
+    fn record_location_time(location: &str, duration_secs: u64) {
+        let mut times = get_location_times().write().unwrap();
+        times.insert(location.to_string(), duration_secs);
+    }
+    
+    fn get_estimated_time(location: &str) -> Option<u64> {
+        let times = get_location_times().read().unwrap();
+        times.get(location).copied()
+    }
+    
+    fn calculate_remaining_estimate(remaining: &[String]) -> Option<u64> {
+        let times = get_location_times().read().unwrap();
+        if times.is_empty() {
+            return None;
+        }
+        
+        let total: u64 = remaining.iter()
+            .filter_map(|loc| times.get(loc).copied())
+            .sum();
+        
+        // For locations without history, use average
+        let known_count = remaining.iter().filter(|loc| times.contains_key(*loc)).count();
+        let unknown_count = remaining.len() - known_count;
+        
+        if unknown_count > 0 && !times.is_empty() {
+            let avg: u64 = times.values().sum::<u64>() / times.len() as u64;
+            Some(total + (unknown_count as u64 * avg))
+        } else if total > 0 {
+            Some(total)
+        } else {
+            None
+        }
     }
 
     pub async fn perform_update(locations: Vec<String>, file_path: &str, settings: Settings) {
@@ -313,6 +417,141 @@ impl BookingManager {
             minutes,
             seconds,
             millis,
+            scraped_count,
+            total_locations
+        );
+    }
+    
+    /// Perform update with status tracking for UI
+    pub async fn perform_update_with_tracking(locations: Vec<String>, file_path: &str, settings: Settings) {
+        use std::time::Instant as StdInstant;
+        
+        let start_time = Instant::now();
+        let max_retries = settings.retries;
+        let total_locations = locations.len();
+
+        let mut scraped_count = 0usize;
+        let mut remaining_locations = locations.clone();
+
+        for attempt in 1..=max_retries {
+            if remaining_locations.is_empty() {
+                println!("INFO: All locations successfully scraped.");
+                break;
+            }
+
+            println!(
+                "INFO: Scraping attempt {}/{} for {} locations...",
+                attempt,
+                max_retries,
+                remaining_locations.len()
+            );
+
+            // Track timing per location
+            let location_start_times: std::sync::Arc<std::sync::Mutex<HashMap<String, StdInstant>>> = 
+                std::sync::Arc::new(std::sync::Mutex::new(HashMap::new()));
+            
+            let times_clone = location_start_times.clone();
+            let settings_clone = settings.clone();
+            
+            // Update status before starting
+            Self::update_scraping_status(|status| {
+                status.remaining_locations = remaining_locations.clone();
+                status.estimated_remaining_secs = Self::calculate_remaining_estimate(&remaining_locations);
+            });
+
+            match super::rta::scrape_rta_timeslots_incremental(
+                remaining_locations.clone(), 
+                &settings,
+                file_path,
+                move |location_booking, fp| {
+                    let location = location_booking.location.clone();
+                    
+                    // Record timing for this location
+                    let mut times = times_clone.lock().unwrap();
+                    if let Some(start) = times.remove(&location) {
+                        let duration = start.elapsed().as_secs();
+                        Self::record_location_time(&location, duration);
+                    }
+                    
+                    // Merge data
+                    Self::merge_location_data(location_booking, &settings_clone);
+                    
+                    // Update status
+                    Self::update_scraping_status(|status| {
+                        status.completed_locations.push(location.clone());
+                        status.remaining_locations.retain(|l| l != &location);
+                        status.current_location = status.remaining_locations.first().cloned();
+                        status.estimated_remaining_secs = Self::calculate_remaining_estimate(&status.remaining_locations);
+                    });
+                    
+                    // Save incrementally
+                    if let Err(e) = Self::save_to_file(fp) {
+                        eprintln!("WARN: Failed to save incremental update: {}", e);
+                    }
+                }
+            ).await {
+                Ok(successful_locations) => {
+                    println!(
+                        "INFO: Successfully scraped {}/{} locations in attempt {}.",
+                        successful_locations.len(),
+                        remaining_locations.len(),
+                        attempt
+                    );
+
+                    scraped_count += successful_locations.len();
+                    remaining_locations.retain(|loc| !successful_locations.contains(loc));
+
+                    if remaining_locations.is_empty() {
+                        println!(
+                            "INFO: All locations successfully scraped after {} attempts.",
+                            attempt
+                        );
+                        break;
+                    } else {
+                        println!(
+                            "WARN: {} locations still need to be scraped.",
+                            remaining_locations.len()
+                        );
+                    }
+                }
+                Err(e) => {
+                    eprintln!(
+                        "ERROR: Scraping failed on attempt {}/{}: {:?}",
+                        attempt, max_retries, e
+                    );
+                    
+                    Self::update_scraping_status(|status| {
+                        status.error_message = Some(format!("Attempt {}/{} failed: {:?}", attempt, max_retries, e));
+                    });
+
+                    if attempt == max_retries {
+                        eprintln!(
+                            "ERROR: Failed to scrape {} locations after {} attempts.",
+                            remaining_locations.len(),
+                            max_retries
+                        );
+                    }
+                }
+            }
+
+            if attempt < max_retries && !remaining_locations.is_empty() {
+                tokio::time::sleep(Duration::from_secs(5)).await;
+            }
+        }
+
+        // Final save
+        if let Err(e) = Self::save_to_file(file_path) {
+            eprintln!(
+                "ERROR: Failed to save booking data to file '{}': {}",
+                file_path, e
+            );
+        }
+
+        let elapsed = start_time.elapsed();
+        println!(
+            "INFO: Total scraping time: {}m {}s ({}/{} locations)",
+            elapsed.as_secs() / 60,
+            elapsed.as_secs() % 60,
             scraped_count,
             total_locations
         );

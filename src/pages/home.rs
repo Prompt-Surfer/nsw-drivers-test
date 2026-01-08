@@ -13,6 +13,16 @@ use crate::pages::location_table::LocationsTable;
 use crate::utils::date::TimeDisplay;
 use crate::utils::geocoding::geocode_address;
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ScrapingStatusResponse {
+    pub is_running: bool,
+    pub current_location: Option<String>,
+    pub completed_count: usize,
+    pub total_count: usize,
+    pub estimated_remaining_secs: Option<u64>,
+    pub error_message: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LocationBookingViewModel {
     pub location: String,
@@ -112,6 +122,60 @@ pub async fn get_location_details(
     }))
 }
 
+#[server(StartScraping)]
+pub async fn start_scraping() -> Result<String, ServerFnError> {
+    use crate::data::booking::BookingManager;
+    use crate::settings::Settings;
+    use std::fs::File;
+    use std::io::Read;
+    
+    // Load settings
+    let settings = Settings::from_yaml("settings.yaml")
+        .map_err(|e| ServerFnError::<NoCustomError>::ServerError(format!("Failed to load settings: {}", e)))?;
+    
+    // Get locations from settings or load all
+    let locations = if settings.locations.is_empty() {
+        // Load all locations from centres.json
+        let mut file = File::open("data/centres.json")
+            .map_err(|e| ServerFnError::<NoCustomError>::ServerError(format!("Failed to open centres.json: {}", e)))?;
+        let mut contents = String::new();
+        file.read_to_string(&mut contents)
+            .map_err(|e| ServerFnError::<NoCustomError>::ServerError(format!("Failed to read centres.json: {}", e)))?;
+        let locs: Vec<crate::data::location::Location> = serde_json::from_str(&contents)
+            .map_err(|e| ServerFnError::<NoCustomError>::ServerError(format!("Failed to parse centres.json: {}", e)))?;
+        locs.into_iter().map(|l| l.id.to_string()).collect()
+    } else {
+        settings.locations.clone()
+    };
+    
+    let count = locations.len();
+    
+    // Trigger scraping
+    BookingManager::trigger_single_scrape(
+        locations,
+        "data/bookings.json".to_string(),
+        settings,
+    ).map_err(|e| ServerFnError::<NoCustomError>::ServerError(e))?;
+    
+    Ok(format!("Scraping started for {} locations", count))
+}
+
+#[server(GetScrapingStatus)]
+pub async fn get_scraping_status() -> Result<ScrapingStatusResponse, ServerFnError> {
+    use crate::data::booking::BookingManager;
+    
+    let status = BookingManager::get_scraping_status();
+    
+    Ok(ScrapingStatusResponse {
+        is_running: status.is_running,
+        current_location: status.current_location,
+        completed_count: status.completed_locations.len(),
+        total_count: status.total_locations,
+        estimated_remaining_secs: status.estimated_remaining_secs,
+        error_message: status.error_message,
+    })
+}
+
 #[component]
 pub fn HomePage() -> impl IntoView {
     let (address_input, set_address_input) = create_signal(String::new());
@@ -131,6 +195,60 @@ pub fn HomePage() -> impl IntoView {
     let (reset_sort_trigger, set_reset_sort_trigger) = create_signal(());
 
     let location_manager = LocationManager::new();
+    
+    // Scraping control state
+    let (scraping_status, set_scraping_status) = create_signal(ScrapingStatusResponse::default());
+    let (scraping_message, set_scraping_message) = create_signal::<Option<String>>(None);
+    
+    let fetch_scraping_status = move || {
+        leptos::task::spawn_local(async move {
+            match get_scraping_status().await {
+                Ok(status) => {
+                    set_scraping_status(status);
+                }
+                Err(e) => {
+                    leptos::logging::log!("Error fetching scraping status: {:?}", e);
+                }
+            }
+        });
+    };
+    
+    let handle_start_scraping = move |_| {
+        set_scraping_message(Some("Starting scraper...".to_string()));
+        
+        leptos::task::spawn_local(async move {
+            match start_scraping().await {
+                Ok(msg) => {
+                    set_scraping_message(Some(msg));
+                }
+                Err(e) => {
+                    set_scraping_message(Some(format!("Error: {:?}", e)));
+                }
+            }
+        });
+    };
+    
+    // Poll scraping status when page loads
+    #[cfg(not(feature = "ssr"))]
+    {
+        fetch_scraping_status();
+        
+        Effect::new(move |_| {
+            let handle = set_interval_with_handle(
+                move || {
+                    fetch_scraping_status();
+                },
+                Duration::from_secs(2),
+            )
+            .expect("failed to set scraping status interval");
+
+            on_cleanup(move || {
+                handle.clear();
+            });
+
+            || {}
+        });
+    }
 
     let fetch_bookings = move || {
         set_is_fetching_bookings(true);
@@ -238,13 +356,76 @@ pub fn HomePage() -> impl IntoView {
 
     view! {
         <div class="max-w-4xl mx-auto p-4">
-            <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-6" role="alert">
-                <strong class="font-bold">Maintenance: </strong>
-                <span class="block sm:inline">Currently Down, Will be back with much lower refresh times</span>
-            </div>
-
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-2xl font-bold text-gray-800">NSW Available Drivers Tests</h2>
+            </div>
+
+            // Scraping Control Panel
+            <div class="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-lg font-semibold text-gray-700">Scraping Control</h3>
+                    <button
+                        class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                        on:click=handle_start_scraping
+                        disabled=move || scraping_status.get().is_running
+                    >
+                        {move || if scraping_status.get().is_running { "Scraping..." } else { "Start Scraping" }}
+                    </button>
+                </div>
+                
+                // Status message
+                {move || scraping_message.get().map(|msg| view! {
+                    <div class="mb-3 text-sm text-blue-600">{msg}</div>
+                })}
+                
+                // Progress bar (shown when scraping is running)
+                {move || {
+                    let status = scraping_status.get();
+                    if status.is_running || status.total_count > 0 {
+                        let progress = if status.total_count > 0 {
+                            (status.completed_count as f64 / status.total_count as f64 * 100.0) as u32
+                        } else {
+                            0
+                        };
+                        
+                        let eta_text = status.estimated_remaining_secs.map(|secs| {
+                            let mins = secs / 60;
+                            let secs = secs % 60;
+                            if mins > 0 {
+                                format!("~{}m {}s remaining", mins, secs)
+                            } else {
+                                format!("~{}s remaining", secs)
+                            }
+                        }).unwrap_or_else(|| "Calculating...".to_string());
+                        
+                        view! {
+                            <div class="space-y-2">
+                                <div class="flex justify-between text-sm text-gray-600">
+                                    <span>
+                                        {move || format!("Progress: {}/{} locations", status.completed_count, status.total_count)}
+                                    </span>
+                                    <span>{eta_text}</span>
+                                </div>
+                                <div class="w-full bg-gray-200 rounded-full h-3">
+                                    <div 
+                                        class="bg-green-500 h-3 rounded-full transition-all duration-500"
+                                        style=move || format!("width: {}%", progress)
+                                    ></div>
+                                </div>
+                                {status.current_location.map(|loc| view! {
+                                    <div class="text-sm text-gray-500">
+                                        "Currently scraping: " <span class="font-medium">{loc}</span>
+                                    </div>
+                                })}
+                                {status.error_message.map(|err| view! {
+                                    <div class="text-sm text-red-600">{err}</div>
+                                })}
+                            </div>
+                        }.into_any()
+                    } else {
+                        view! { <div class="text-sm text-gray-500">No scraping in progress. Click "Start Scraping" to begin.</div> }.into_any()
+                    }
+                }}
             </div>
 
             <div class="mb-6">

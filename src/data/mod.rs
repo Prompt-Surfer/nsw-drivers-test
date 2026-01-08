@@ -5,3 +5,6 @@ pub mod shared_booking;
 pub mod booking;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod rta;
+
+#[cfg(not(target_arch = "wasm32"))]
+pub use booking::ScrapingStatus;

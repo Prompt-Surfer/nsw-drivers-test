@@ -43,18 +43,9 @@ async fn main() {
         Err(e) => println!("Failed to initialize BookingManager from file: {}", e),
     }
 
-    let settings = Settings::from_yaml("settings.yaml").unwrap();
-
-    // Use filtered locations from settings, or all locations if empty
-    let location_id = if settings.locations.is_empty() {
-        get_location_names()
-    } else {
-        settings.locations.clone()
-    };
-    
-    println!("INFO: Scraping {} locations", location_id.len());
-
-    BookingManager::start_background_updates(location_id, data_file_path.to_string(), settings);
+    // Initialize settings for later use (scraping started via UI)
+    let _ = Settings::from_yaml("settings.yaml").unwrap();
+    println!("INFO: Server started. Scraping can be triggered from the UI.");
 
     let app = Router::new()
         .leptos_routes(&leptos_options, routes, {
