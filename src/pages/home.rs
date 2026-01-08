@@ -285,8 +285,6 @@ pub async fn get_all_locations() -> Result<Vec<LocationOption>, ServerFnError> {
     }).collect())
 }
 
-const MONTHS: [&str; 12] = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
 #[component]
 pub fn AlertBanner(
     alerts: ReadSignal<Vec<SlotAlertResponse>>,
@@ -345,203 +343,42 @@ pub fn AlertBanner(
 }
 
 #[component]
-pub fn AlertSettingsPanel(
-    all_locations: ReadSignal<Vec<LocationOption>>,
-    alert_settings: ReadSignal<AlertSettingsResponse>,
-    on_save: impl Fn(bool, Vec<AlertConfig>) + 'static + Copy + Send + Sync,
+pub fn AlertToggle(
+    alerts_enabled: ReadSignal<bool>,
+    on_toggle: impl Fn(bool) + 'static + Copy + Send + Sync,
 ) -> impl IntoView {
-    let (is_expanded, set_is_expanded) = create_signal(false);
-    let (local_enabled, set_local_enabled) = create_signal(false);
-    let (local_alerts, set_local_alerts) = create_signal::<Vec<AlertConfig>>(vec![]);
-    let (has_changes, set_has_changes) = create_signal(false);
-
-    // Initialize local state from props
-    Effect::new(move |_| {
-        let settings = alert_settings.get();
-        set_local_enabled(settings.alerts_enabled);
-        set_local_alerts(settings.alerts.clone());
-    });
-
-    let toggle_location = move |location_id: String, location_name: String| {
-        set_local_alerts.update(|alerts| {
-            if let Some(alert) = alerts.iter_mut().find(|a| a.location_id == location_id) {
-                alert.enabled = !alert.enabled;
-            } else {
-                alerts.push(AlertConfig {
-                    location_id,
-                    location_name,
-                    enabled: true,
-                    months: vec![3, 4, 5, 6], // Default to Mar-Jun
-                });
-            }
-        });
-        set_has_changes(true);
-    };
-
-    let toggle_month = move |location_id: String, month: u32| {
-        set_local_alerts.update(|alerts| {
-            if let Some(alert) = alerts.iter_mut().find(|a| a.location_id == location_id) {
-                if alert.months.contains(&month) {
-                    alert.months.retain(|&m| m != month);
-                } else {
-                    alert.months.push(month);
-                    alert.months.sort();
-                }
-            }
-        });
-        set_has_changes(true);
-    };
-
-    let handle_save = move |_| {
-        on_save(local_enabled.get(), local_alerts.get());
-        set_has_changes(false);
-    };
-
     view! {
-        <div class="mb-6 border border-gray-200 rounded-lg overflow-hidden">
-            <button
-                class="w-full p-4 bg-gray-50 flex items-center justify-between hover:bg-gray-100 transition-colors"
-                on:click=move |_| set_is_expanded.update(|v| *v = !*v)
-            >
-                <div class="flex items-center gap-2">
+        <div class="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-600" viewBox="0 0 20 20" fill="currentColor">
                         <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
                     </svg>
-                    <span class="font-semibold text-gray-700">"Alert Settings"</span>
-                    {move || if local_enabled.get() {
+                    <div>
+                        <span class="font-semibold text-gray-700">"Alerts"</span>
+                        <p class="text-sm text-gray-500">"Enable alerts and check locations in the table below to monitor"</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    {move || if alerts_enabled.get() {
                         view! { <span class="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">"Enabled"</span> }.into_any()
                     } else {
                         view! { <span class="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">"Disabled"</span> }.into_any()
                     }}
+                    <button
+                        class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+                        class:bg-green-600=move || alerts_enabled.get()
+                        class:bg-gray-200=move || !alerts_enabled.get()
+                        on:click=move |_| on_toggle(!alerts_enabled.get())
+                    >
+                        <span
+                            class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+                            class:translate-x-5=move || alerts_enabled.get()
+                            class:translate-x-0=move || !alerts_enabled.get()
+                        ></span>
+                    </button>
                 </div>
-                <svg 
-                    xmlns="http://www.w3.org/2000/svg" 
-                    class="h-5 w-5 text-gray-400 transition-transform"
-                    class:rotate-180=move || is_expanded.get()
-                    viewBox="0 0 20 20" 
-                    fill="currentColor"
-                >
-                    <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
-                </svg>
-            </button>
-            
-            {move || if is_expanded.get() {
-                view! {
-                    <div class="p-4 bg-white border-t border-gray-200">
-                        // Master toggle
-                        <div class="flex items-center justify-between mb-4 pb-4 border-b border-gray-200">
-                            <div>
-                                <label class="font-medium text-gray-700">"Enable Alerts"</label>
-                                <p class="text-sm text-gray-500">"Get Windows notifications and webpage alerts when slots become available"</p>
-                            </div>
-                            <button
-                                class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
-                                class:bg-green-600=move || local_enabled.get()
-                                class:bg-gray-200=move || !local_enabled.get()
-                                on:click=move |_| {
-                                    set_local_enabled.update(|v| *v = !*v);
-                                    set_has_changes(true);
-                                }
-                            >
-                                <span
-                                    class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
-                                    class:translate-x-5=move || local_enabled.get()
-                                    class:translate-x-0=move || !local_enabled.get()
-                                ></span>
-                            </button>
-                        </div>
-
-                        // Location selection
-                        <div class="mb-4">
-                            <h4 class="font-medium text-gray-700 mb-2">"Select Locations to Monitor"</h4>
-                            <p class="text-sm text-gray-500 mb-3">"Only selected locations will be scraped and monitored for alerts"</p>
-                            <div class="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-64 overflow-y-auto">
-                                {move || {
-                                    let locations = all_locations.get();
-                                    let alerts = local_alerts.get();
-                                    locations.into_iter().map(|loc| {
-                                        let loc_id = loc.id.clone();
-                                        let loc_name = loc.name.clone();
-                                        let loc_id2 = loc.id.clone();
-                                        let is_enabled = alerts.iter().any(|a| a.location_id == loc_id && a.enabled);
-                                        view! {
-                                            <label class="flex items-center gap-2 p-2 rounded hover:bg-gray-50 cursor-pointer">
-                                                <input
-                                                    type="checkbox"
-                                                    class="h-4 w-4 text-green-600 rounded border-gray-300 focus:ring-green-500"
-                                                    checked=is_enabled
-                                                    on:change=move |_| toggle_location(loc_id2.clone(), loc_name.clone())
-                                                />
-                                                <span class="text-sm text-gray-700">{loc.name}</span>
-                                            </label>
-                                        }
-                                    }).collect::<Vec<_>>()
-                                }}
-                            </div>
-                        </div>
-
-                        // Month selection for each enabled location
-                        {move || {
-                            let alerts = local_alerts.get();
-                            let enabled_alerts: Vec<_> = alerts.iter().filter(|a| a.enabled).cloned().collect();
-                            if enabled_alerts.is_empty() {
-                                view! { <div class="hidden"></div> }.into_any()
-                            } else {
-                                view! {
-                                    <div class="mb-4">
-                                        <h4 class="font-medium text-gray-700 mb-2">"Select Months to Monitor"</h4>
-                                        <p class="text-sm text-gray-500 mb-3">"Choose which months to monitor for each location"</p>
-                                        <div class="space-y-3">
-                                            {enabled_alerts.into_iter().map(|alert| {
-                                                let loc_id = alert.location_id.clone();
-                                                view! {
-                                                    <div class="p-3 bg-gray-50 rounded-lg">
-                                                        <div class="font-medium text-gray-700 mb-2">{alert.location_name.clone()}</div>
-                                                        <div class="flex flex-wrap gap-1">
-                                                            {MONTHS.iter().enumerate().map(|(idx, month)| {
-                                                                let month_num = (idx + 1) as u32;
-                                                                let loc_id_clone = loc_id.clone();
-                                                                let is_selected = alert.months.contains(&month_num);
-                                                                view! {
-                                                                    <button
-                                                                        class="px-2 py-1 text-xs rounded transition-colors"
-                                                                        class:bg-green-600=is_selected
-                                                                        class:text-white=is_selected
-                                                                        class:bg-gray-200=!is_selected
-                                                                        class:text-gray-600=!is_selected
-                                                                        class:hover:bg-green-500=is_selected
-                                                                        class:hover:bg-gray-300=!is_selected
-                                                                        on:click=move |_| toggle_month(loc_id_clone.clone(), month_num)
-                                                                    >
-                                                                        {*month}
-                                                                    </button>
-                                                                }
-                                                            }).collect::<Vec<_>>()}
-                                                        </div>
-                                                    </div>
-                                                }
-                                            }).collect::<Vec<_>>()}
-                                        </div>
-                                    </div>
-                                }.into_any()
-                            }
-                        }}
-
-                        // Save button
-                        <div class="flex justify-end pt-4 border-t border-gray-200">
-                            <button
-                                class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-                                disabled=move || !has_changes.get()
-                                on:click=handle_save
-                            >
-                                {move || if has_changes.get() { "Save Changes" } else { "Saved" }}
-                            </button>
-                        </div>
-                    </div>
-                }.into_any()
-            } else {
-                view! { <div class="hidden"></div> }.into_any()
-            }}
+            </div>
         </div>
     }
 }
@@ -572,8 +409,8 @@ pub fn HomePage() -> impl IntoView {
     
     // Alert state
     let (active_alerts, set_active_alerts) = create_signal::<Vec<SlotAlertResponse>>(vec![]);
-    let (alert_settings, set_alert_settings) = create_signal(AlertSettingsResponse::default());
-    let (all_locations, set_all_locations) = create_signal::<Vec<LocationOption>>(vec![]);
+    let (alerts_enabled, set_alerts_enabled) = create_signal(false);
+    let (alert_configs, set_alert_configs) = create_signal::<Vec<AlertConfig>>(vec![]);
 
     let fetch_scraping_status = move || {
         leptos::task::spawn_local(async move {
@@ -605,7 +442,8 @@ pub fn HomePage() -> impl IntoView {
         leptos::task::spawn_local(async move {
             match get_alert_settings().await {
                 Ok(settings) => {
-                    set_alert_settings(settings);
+                    set_alerts_enabled(settings.alerts_enabled);
+                    set_alert_configs(settings.alerts);
                 }
                 Err(e) => {
                     leptos::logging::log!("Error fetching alert settings: {:?}", e);
@@ -614,15 +452,12 @@ pub fn HomePage() -> impl IntoView {
         });
     };
     
-    let fetch_all_locations = move || {
+    let save_current_settings = move || {
+        let enabled = alerts_enabled.get_untracked();
+        let configs = alert_configs.get_untracked();
         leptos::task::spawn_local(async move {
-            match get_all_locations().await {
-                Ok(locations) => {
-                    set_all_locations(locations);
-                }
-                Err(e) => {
-                    leptos::logging::log!("Error fetching locations: {:?}", e);
-                }
+            if let Err(e) = save_alert_settings(enabled, configs).await {
+                leptos::logging::log!("Error saving alert settings: {:?}", e);
             }
         });
     };
@@ -660,17 +495,39 @@ pub fn HomePage() -> impl IntoView {
         });
     };
     
-    let handle_save_alert_settings = move |enabled: bool, alerts: Vec<AlertConfig>| {
-        leptos::task::spawn_local(async move {
-            match save_alert_settings(enabled, alerts).await {
-                Ok(_) => {
-                    fetch_alert_settings();
-                }
-                Err(e) => {
-                    leptos::logging::log!("Error saving alert settings: {:?}", e);
+    let handle_toggle_alerts_enabled = move |enabled: bool| {
+        set_alerts_enabled(enabled);
+        save_current_settings();
+    };
+    
+    let handle_toggle_alert = move |location_id: String, location_name: String, enabled: bool| {
+        set_alert_configs.update(|configs| {
+            if let Some(config) = configs.iter_mut().find(|c| c.location_id == location_id) {
+                config.enabled = enabled;
+            } else if enabled {
+                configs.push(AlertConfig {
+                    location_id,
+                    location_name,
+                    enabled: true,
+                    months: vec![3, 4, 5, 6], // Default to Mar-Jun
+                });
+            }
+        });
+        save_current_settings();
+    };
+    
+    let handle_toggle_month = move |location_id: String, month: u32| {
+        set_alert_configs.update(|configs| {
+            if let Some(config) = configs.iter_mut().find(|c| c.location_id == location_id) {
+                if config.months.contains(&month) {
+                    config.months.retain(|&m| m != month);
+                } else {
+                    config.months.push(month);
+                    config.months.sort();
                 }
             }
         });
+        save_current_settings();
     };
     
     // Poll scraping status and alerts when page loads
@@ -679,7 +536,6 @@ pub fn HomePage() -> impl IntoView {
         fetch_scraping_status();
         fetch_active_alerts();
         fetch_alert_settings();
-        fetch_all_locations();
         
         Effect::new(move |_| {
             let handle = set_interval_with_handle(
@@ -816,11 +672,10 @@ pub fn HomePage() -> impl IntoView {
                 on_dismiss_all=handle_dismiss_all
             />
 
-            // Alert Settings Panel
-            <AlertSettingsPanel
-                all_locations=all_locations
-                alert_settings=alert_settings
-                on_save=handle_save_alert_settings
+            // Alert Toggle (simplified)
+            <AlertToggle
+                alerts_enabled=alerts_enabled
+                on_toggle=handle_toggle_alerts_enabled
             />
 
             // Scraping Control Panel
@@ -1022,6 +877,10 @@ pub fn HomePage() -> impl IntoView {
                 longitude=longitude
                 location_manager=location_manager.clone()
                 reset_sort_trigger=reset_sort_trigger
+                alerts_enabled=alerts_enabled
+                alert_configs=alert_configs
+                on_toggle_alert=handle_toggle_alert
+                on_toggle_month=handle_toggle_month
             />
 
             <div class="mt-6 flex justify-between items-center">
