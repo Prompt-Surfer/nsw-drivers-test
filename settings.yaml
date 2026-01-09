@@ -11,6 +11,12 @@ locations:
 - '621'
 - '17'
 - '96'
+- '241'
+- '63'
+- '35'
+- '601'
+- '37'
+- '112'
 date_filter_start: 2026-02-01
 date_filter_end: 2026-09-30
 alerts:
@@ -86,7 +92,7 @@ alerts:
   - 4
   - 5
   - 6
-alerts_enabled: false
+alerts_enabled: true
 auto_scrape_enabled: false
-auto_scrape_interval_hours: 0
+auto_scrape_interval_hours: 2
 parallel_workers: 3

@@ -82,7 +82,6 @@ async fn create_driver(settings: &Settings) -> WebDriverResult<WebDriver> {
     caps.add_arg("--no-sandbox")?;
     caps.add_arg("--disable-dev-shm-usage")?;
     caps.add_arg("--disable-gpu")?;
-    caps.add_arg("--start-maximized")?;
     caps.add_arg("--window-size=1920,1080")?;
     caps.add_arg("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36")?;
 
@@ -245,9 +244,6 @@ pub async fn login_to_portal_only(settings: &Settings) -> WebDriverResult<String
     println!("INFO: Opening browser and logging into RTA portal...");
     
     let driver = create_driver(settings).await?;
-    
-    // Maximize window after creation
-    driver.maximize_window().await?;
     
     login_and_navigate_to_booking(&driver, settings).await?;
     
@@ -530,7 +526,6 @@ where
     caps.add_arg("--no-sandbox")?;
     caps.add_arg("--disable-dev-shm-usage")?;
     caps.add_arg("--disable-gpu")?;
-    caps.add_arg("--start-maximized")?;
     caps.add_arg("--window-size=1920,1080")?;
     caps.add_arg("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36");
 
@@ -828,7 +823,6 @@ pub async fn scrape_rta_timeslots(
     caps.add_arg("--no-sandbox")?;
     caps.add_arg("--disable-dev-shm-usage")?;
     caps.add_arg("--disable-gpu")?;
-    caps.add_arg("--start-maximized")?;
     caps.add_arg("--window-size=1920,1080")?;
     caps.add_arg("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36");
 
