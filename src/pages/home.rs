@@ -155,6 +155,8 @@ pub async fn start_scraping() -> Result<String, ServerFnError> {
     use std::fs::File;
     use std::io::Read;
     
+    println!("INFO: start_scraping server function called (from UI button)");
+    
     // Load settings
     let settings = Settings::from_yaml("settings.yaml")
         .map_err(|e| ServerFnError::<NoCustomError>::ServerError(format!("Failed to load settings: {}", e)))?;

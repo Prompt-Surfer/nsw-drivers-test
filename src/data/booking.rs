@@ -6,6 +6,7 @@ use std::fs::{self, File};
 use std::hash::{DefaultHasher, Hasher};
 use std::path::Path;
 use std::sync::{Arc, OnceLock, RwLock};
+use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
 use std::time::{Duration, Instant};
 
 use super::location::LocationManager;
@@ -17,6 +18,7 @@ static BACKGROUND_RUNNING: OnceLock<Arc<RwLock<bool>>> = OnceLock::new();
 static SCRAPING_STATUS: OnceLock<Arc<RwLock<ScrapingStatus>>> = OnceLock::new();
 static LOCATION_TIMES: OnceLock<Arc<RwLock<HashMap<String, u64>>>> = OnceLock::new();
 static SCHEDULER_STATE: OnceLock<Arc<RwLock<SchedulerState>>> = OnceLock::new();
+static SCHEDULER_GENERATION: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ScrapingStatus {
@@ -252,6 +254,8 @@ impl BookingManager {
     
     /// Trigger a single scraping run (no repeat loop)
     pub fn trigger_single_scrape(locations: Vec<String>, file_path: String, settings: Settings) -> Result<(), String> {
+        println!("INFO: trigger_single_scrape called for {} locations", locations.len());
+        
         // Check if already running
         if Self::is_scraping_running() {
             return Err("Scraping is already in progress".to_string());
@@ -642,33 +646,46 @@ impl BookingManager {
     
     /// Start the automatic scraping scheduler
     pub fn start_scheduler(interval_hours: u32) {
+        // Ensure minimum interval of 1 hour to prevent spam
+        let interval_hours = interval_hours.max(1);
+        
+        // Increment generation to invalidate any old scheduler tasks
+        let my_generation = SCHEDULER_GENERATION.fetch_add(1, AtomicOrdering::SeqCst) + 1;
+        
         // Update scheduler state
         {
             let mut state = get_scheduler_state().write().unwrap();
-            if state.enabled {
-                println!("INFO: Scheduler already running");
-                return;
-            }
             state.enabled = true;
             state.interval_hours = interval_hours;
             let next_run = chrono::Utc::now() + chrono::Duration::hours(interval_hours as i64);
             state.next_run_at = Some(next_run.to_rfc3339());
         }
         
-        println!("INFO: Starting scheduler with interval of {} hours", interval_hours);
-        
-        let interval_secs = interval_hours as u64 * 3600;
+        println!("INFO: Starting scheduler (gen {}) with interval of {} hours", my_generation, interval_hours);
         
         tokio::spawn(async move {
             loop {
+                // Read current interval from state (allows real-time updates from UI)
+                let interval_secs = {
+                    let state = get_scheduler_state().read().unwrap();
+                    state.interval_hours.max(1) as u64 * 3600
+                };
+                
                 // Wait for the interval
                 tokio::time::sleep(Duration::from_secs(interval_secs)).await;
+                
+                // Check if this scheduler task is still the current one
+                let current_gen = SCHEDULER_GENERATION.load(AtomicOrdering::SeqCst);
+                if my_generation != current_gen {
+                    println!("INFO: Scheduler (gen {}) superseded by gen {}, exiting", my_generation, current_gen);
+                    break;
+                }
                 
                 // Check if still enabled
                 {
                     let state = get_scheduler_state().read().unwrap();
                     if !state.enabled {
-                        println!("INFO: Scheduler disabled, stopping");
+                        println!("INFO: Scheduler (gen {}) disabled, stopping", my_generation);
                         break;
                     }
                 }
@@ -676,10 +693,10 @@ impl BookingManager {
                 // Check if scraping is already running
                 if Self::is_scraping_running() {
                     println!("INFO: Scraping already in progress, skipping scheduled run");
-                    // Update next run time
+                    // Update next run time using current interval
                     {
                         let mut state = get_scheduler_state().write().unwrap();
-                        let next_run = chrono::Utc::now() + chrono::Duration::hours(state.interval_hours as i64);
+                        let next_run = chrono::Utc::now() + chrono::Duration::hours(state.interval_hours.max(1) as i64);
                         state.next_run_at = Some(next_run.to_rfc3339());
                     }
                     continue;
@@ -708,7 +725,7 @@ impl BookingManager {
                         };
                         
                         if !locations.is_empty() {
-                            println!("INFO: [Scheduler] Starting scheduled scrape for {} locations", locations.len());
+                            println!("INFO: [Scheduler gen {}] Starting scheduled scrape for {} locations", my_generation, locations.len());
                             
                             // Trigger the scrape
                             let _ = Self::trigger_single_scrape(
@@ -723,10 +740,10 @@ impl BookingManager {
                     }
                 }
                 
-                // Update next run time
+                // Update next run time using current interval
                 {
                     let mut state = get_scheduler_state().write().unwrap();
-                    let next_run = chrono::Utc::now() + chrono::Duration::hours(state.interval_hours as i64);
+                    let next_run = chrono::Utc::now() + chrono::Duration::hours(state.interval_hours.max(1) as i64);
                     state.next_run_at = Some(next_run.to_rfc3339());
                 }
             }
@@ -735,6 +752,9 @@ impl BookingManager {
     
     /// Stop the automatic scraping scheduler
     pub fn stop_scheduler() {
+        // Increment generation to invalidate any running scheduler tasks
+        SCHEDULER_GENERATION.fetch_add(1, AtomicOrdering::SeqCst);
+        
         let mut state = get_scheduler_state().write().unwrap();
         state.enabled = false;
         state.next_run_at = None;
@@ -743,6 +763,9 @@ impl BookingManager {
     
     /// Update scheduler interval (requires restart to take effect)
     pub fn update_scheduler_interval(interval_hours: u32) {
+        // Ensure minimum interval of 1 hour
+        let interval_hours = interval_hours.max(1);
+        
         let mut state = get_scheduler_state().write().unwrap();
         state.interval_hours = interval_hours;
         if state.enabled {
