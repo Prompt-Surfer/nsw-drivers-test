@@ -195,6 +195,20 @@ pub async fn stop_scraping() -> Result<String, ServerFnError> {
     Ok("Scraping stopped".to_string())
 }
 
+#[server(LoginToPortal, prefix = "/api", endpoint = "login_to_portal")]
+pub async fn login_to_portal() -> Result<String, ServerFnError> {
+    use crate::settings::Settings;
+    use crate::data::rta::login_to_portal_only;
+    
+    // Load settings
+    let settings = Settings::from_yaml("settings.yaml")
+        .map_err(|e| ServerFnError::<NoCustomError>::ServerError(format!("Failed to load settings: {}", e)))?;
+    
+    // Login and navigate to site selector
+    login_to_portal_only(&settings).await
+        .map_err(|e| ServerFnError::<NoCustomError>::ServerError(format!("Login failed: {}", e)))
+}
+
 #[server(GetScrapingStatus, prefix = "/api", endpoint = "get_scraping_status")]
 pub async fn get_scraping_status() -> Result<ScrapingStatusResponse, ServerFnError> {
     use crate::data::booking::BookingManager;
@@ -662,6 +676,21 @@ pub fn HomePage() -> impl IntoView {
         });
     };
     
+    let handle_login = move |_| {
+        set_scraping_message(Some("Opening browser and logging in...".to_string()));
+        
+        leptos::task::spawn_local(async move {
+            match login_to_portal().await {
+                Ok(msg) => {
+                    set_scraping_message(Some(msg));
+                }
+                Err(e) => {
+                    set_scraping_message(Some(format!("Login error: {:?}", e)));
+                }
+            }
+        });
+    };
+    
     let handle_dismiss_alert = move |location_id: String, slot_time: String| {
         leptos::task::spawn_local(async move {
             if let Err(e) = dismiss_alert(location_id, slot_time).await {
@@ -899,28 +928,36 @@ pub fn HomePage() -> impl IntoView {
             <div class="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
                 <div class="flex items-center justify-between mb-3">
                     <h3 class="text-lg font-semibold text-gray-700">Scraping Control</h3>
-                    {move || {
-                        let is_running = scraping_status.get().is_running;
-                        if is_running {
-                            view! {
-                                <button
-                                    class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors"
-                                    on:click=handle_stop_scraping
-                                >
-                                    "Stop Scraping"
-                                </button>
-                            }.into_any()
-                        } else {
-                            view! {
-                                <button
-                                    class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors"
-                                    on:click=handle_start_scraping
-                                >
-                                    "Start Scraping"
-                                </button>
-                            }.into_any()
-                        }
-                    }}
+                    <div class="flex gap-2">
+                        <button
+                            class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                            on:click=handle_login
+                        >
+                            "Login"
+                        </button>
+                        {move || {
+                            let is_running = scraping_status.get().is_running;
+                            if is_running {
+                                view! {
+                                    <button
+                                        class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors"
+                                        on:click=handle_stop_scraping
+                                    >
+                                        "Stop Scraping"
+                                    </button>
+                                }.into_any()
+                            } else {
+                                view! {
+                                    <button
+                                        class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors"
+                                        on:click=handle_start_scraping
+                                    >
+                                        "Start Scraping"
+                                    </button>
+                                }.into_any()
+                            }
+                        }}
+                    </div>
                 </div>
                 
                 // Status message
