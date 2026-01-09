@@ -186,6 +186,15 @@ pub async fn start_scraping() -> Result<String, ServerFnError> {
     Ok(format!("Scraping started for {} locations", count))
 }
 
+#[server(StopScraping, prefix = "/api", endpoint = "stop_scraping")]
+pub async fn stop_scraping() -> Result<String, ServerFnError> {
+    use crate::data::booking::BookingManager;
+    
+    BookingManager::stop_background_updates();
+    
+    Ok("Scraping stopped".to_string())
+}
+
 #[server(GetScrapingStatus, prefix = "/api", endpoint = "get_scraping_status")]
 pub async fn get_scraping_status() -> Result<ScrapingStatusResponse, ServerFnError> {
     use crate::data::booking::BookingManager;
@@ -638,6 +647,21 @@ pub fn HomePage() -> impl IntoView {
         });
     };
     
+    let handle_stop_scraping = move |_| {
+        set_scraping_message(Some("Stopping scraper...".to_string()));
+        
+        leptos::task::spawn_local(async move {
+            match stop_scraping().await {
+                Ok(msg) => {
+                    set_scraping_message(Some(msg));
+                }
+                Err(e) => {
+                    set_scraping_message(Some(format!("Error stopping: {:?}", e)));
+                }
+            }
+        });
+    };
+    
     let handle_dismiss_alert = move |location_id: String, slot_time: String| {
         leptos::task::spawn_local(async move {
             if let Err(e) = dismiss_alert(location_id, slot_time).await {
@@ -875,13 +899,28 @@ pub fn HomePage() -> impl IntoView {
             <div class="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
                 <div class="flex items-center justify-between mb-3">
                     <h3 class="text-lg font-semibold text-gray-700">Scraping Control</h3>
-                    <button
-                        class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-                        on:click=handle_start_scraping
-                        disabled=move || scraping_status.get().is_running
-                    >
-                        {move || if scraping_status.get().is_running { "Scraping..." } else { "Start Scraping" }}
-                    </button>
+                    {move || {
+                        let is_running = scraping_status.get().is_running;
+                        if is_running {
+                            view! {
+                                <button
+                                    class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors"
+                                    on:click=handle_stop_scraping
+                                >
+                                    "Stop Scraping"
+                                </button>
+                            }.into_any()
+                        } else {
+                            view! {
+                                <button
+                                    class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors"
+                                    on:click=handle_start_scraping
+                                >
+                                    "Start Scraping"
+                                </button>
+                            }.into_any()
+                        }
+                    }}
                 </div>
                 
                 // Status message

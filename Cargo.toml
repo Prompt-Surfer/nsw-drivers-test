@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [[bin]]
-name = "nsw-closest-display-server"
+name = "nsw-closest-display"
 path = "src/main.rs"
 
 [lib]
@@ -95,7 +95,7 @@ browserquery = "defaults"
 env = "DEV"
 
 # The name of the binary target to use
-bin-target = "nsw-closest-display-server"
+bin-target = "nsw-closest-display"
 
 # The features to use when compiling the bin target
 #

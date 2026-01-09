@@ -87,4 +87,6 @@ alerts:
   - 5
   - 6
 alerts_enabled: false
+auto_scrape_enabled: false
+auto_scrape_interval_hours: 0
 parallel_workers: 3

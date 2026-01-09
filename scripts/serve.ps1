@@ -23,8 +23,8 @@ $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";"
 # Start ChromeDriver
 $chromedriverPath = ".\chromedriver-win64\chromedriver.exe"
 if (Test-Path $chromedriverPath) {
-    Start-Process -FilePath $chromedriverPath -ArgumentList "--port=57908", "--allowed-origins=*" -WindowStyle Hidden
-    Write-Host "ChromeDriver started on port 57908" -ForegroundColor Green
+    Start-Process -FilePath $chromedriverPath -ArgumentList "--port=57909", "--allowed-origins=*" -WindowStyle Hidden
+    Write-Host "ChromeDriver started on port 57909" -ForegroundColor Green
     Start-Sleep -Seconds 2
 } else {
     Write-Host "Warning: ChromeDriver not found at $chromedriverPath" -ForegroundColor Yellow
