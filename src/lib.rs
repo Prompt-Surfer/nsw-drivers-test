@@ -2,7 +2,7 @@
 pub mod app;
 pub mod data;
 pub mod notifications;
-mod pages;
+pub mod pages;
 pub mod settings;
 pub mod utils;
 

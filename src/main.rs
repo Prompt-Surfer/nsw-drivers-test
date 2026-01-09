@@ -6,6 +6,7 @@ use nsw_closest_display::app::{shell, App};
 use nsw_closest_display::data::booking::BookingManager;
 use nsw_closest_display::settings::Settings;
 
+
 #[tokio::main]
 async fn main() {
     let conf = get_configuration(None).unwrap();
@@ -24,6 +25,31 @@ async fn main() {
     println!("INFO: Server started. Scraping can be triggered from the UI.");
 
     let app = Router::new()
+        .route("/api/test_scrape", axum::routing::post(|| async {
+            println!("INFO: Test scrape endpoint called");
+            let settings = Settings::from_yaml("settings.yaml").unwrap();
+            let locations = vec!["621".to_string(), "17".to_string(), "96".to_string()];
+            tokio::spawn(async move {
+                use nsw_closest_display::data::rta::scrape_rta_parallel;
+                let result = scrape_rta_parallel(
+                    locations,
+                    &settings,
+                    "data/test_bookings.json",
+                    |booking, _| {
+                        println!("INFO: Successfully scraped location: {}", booking.location);
+                    }
+                ).await;
+                match result {
+                    Ok(_) => println!("INFO: Test scrape completed successfully"),
+                    Err(e) => println!("ERROR: Test scrape failed: {:?}", e),
+                }
+            });
+            "Test scrape started"
+        }))
+        .route("/api/*path", axum::routing::any(|req: axum::http::Request<axum::body::Body>| async {
+            println!("DEBUG: Server function called: {:?}", req.uri().path());
+            leptos_axum::handle_server_fns(req).await
+        }))
         .leptos_routes(&leptos_options, routes, {
             let leptos_options = leptos_options.clone();
             move || shell(leptos_options.clone())

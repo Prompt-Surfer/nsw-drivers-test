@@ -74,7 +74,7 @@ pub struct LocationOption {
     pub name: String,
 }
 
-#[server(GetBookings)]
+#[server(GetBookings, prefix = "/api", endpoint = "get_bookings")]
 pub async fn get_location_bookings(
     client_etag: String,
 ) -> Result<Option<BookingResponse>, ServerFnError> {
@@ -126,7 +126,7 @@ pub async fn get_location_bookings(
     }))
 }
 
-#[server(GetLocationDetails)]
+#[server(GetLocationDetails, prefix = "/api", endpoint = "get_location_details")]
 pub async fn get_location_details(
     location_id: String,
     client_etag: String,
@@ -148,7 +148,7 @@ pub async fn get_location_details(
     }))
 }
 
-#[server(StartScraping)]
+#[server(StartScraping, prefix = "/api", endpoint = "start_scraping")]
 pub async fn start_scraping() -> Result<String, ServerFnError> {
     use crate::data::booking::BookingManager;
     use crate::settings::Settings;
@@ -186,7 +186,7 @@ pub async fn start_scraping() -> Result<String, ServerFnError> {
     Ok(format!("Scraping started for {} locations", count))
 }
 
-#[server(GetScrapingStatus)]
+#[server(GetScrapingStatus, prefix = "/api", endpoint = "get_scraping_status")]
 pub async fn get_scraping_status() -> Result<ScrapingStatusResponse, ServerFnError> {
     use crate::data::booking::BookingManager;
     
@@ -204,7 +204,7 @@ pub async fn get_scraping_status() -> Result<ScrapingStatusResponse, ServerFnErr
     })
 }
 
-#[server(GetAlertSettings)]
+#[server(GetAlertSettings, prefix = "/api", endpoint = "get_alert_settings")]
 pub async fn get_alert_settings() -> Result<AlertSettingsResponse, ServerFnError> {
     use crate::settings::Settings;
     
@@ -217,7 +217,7 @@ pub async fn get_alert_settings() -> Result<AlertSettingsResponse, ServerFnError
     })
 }
 
-#[server(SaveAlertSettings)]
+#[server(SaveAlertSettings, prefix = "/api", endpoint = "save_alert_settings")]
 pub async fn save_alert_settings(
     alerts_enabled: bool,
     alerts: Vec<AlertConfig>,
@@ -249,7 +249,7 @@ pub async fn save_alert_settings(
     Ok(())
 }
 
-#[server(GetActiveAlerts)]
+#[server(GetActiveAlerts, prefix = "/api", endpoint = "get_active_alerts")]
 pub async fn get_active_alerts() -> Result<Vec<SlotAlertResponse>, ServerFnError> {
     use crate::notifications::NotificationManager;
     
@@ -263,7 +263,7 @@ pub async fn get_active_alerts() -> Result<Vec<SlotAlertResponse>, ServerFnError
     }).collect())
 }
 
-#[server(DismissAlert)]
+#[server(DismissAlert, prefix = "/api", endpoint = "dismiss_alert")]
 pub async fn dismiss_alert(location_id: String, slot_time: String) -> Result<(), ServerFnError> {
     use crate::notifications::NotificationManager;
     
@@ -271,7 +271,7 @@ pub async fn dismiss_alert(location_id: String, slot_time: String) -> Result<(),
     Ok(())
 }
 
-#[server(DismissAllAlerts)]
+#[server(DismissAllAlerts, prefix = "/api", endpoint = "dismiss_all_alerts")]
 pub async fn dismiss_all_alerts() -> Result<(), ServerFnError> {
     use crate::notifications::NotificationManager;
     
@@ -279,7 +279,7 @@ pub async fn dismiss_all_alerts() -> Result<(), ServerFnError> {
     Ok(())
 }
 
-#[server(GetAllLocations)]
+#[server(GetAllLocations, prefix = "/api", endpoint = "get_all_locations")]
 pub async fn get_all_locations() -> Result<Vec<LocationOption>, ServerFnError> {
     use crate::data::location::LocationManager;
     
@@ -292,7 +292,7 @@ pub async fn get_all_locations() -> Result<Vec<LocationOption>, ServerFnError> {
     }).collect())
 }
 
-#[server(GetSchedulerStatus)]
+#[server(GetSchedulerStatus, prefix = "/api", endpoint = "get_scheduler_status")]
 pub async fn get_scheduler_status() -> Result<SchedulerStatusResponse, ServerFnError> {
     use crate::data::booking::BookingManager;
     
@@ -305,7 +305,7 @@ pub async fn get_scheduler_status() -> Result<SchedulerStatusResponse, ServerFnE
     })
 }
 
-#[server(SetSchedulerEnabled)]
+#[server(SetSchedulerEnabled, prefix = "/api", endpoint = "set_scheduler_enabled")]
 pub async fn set_scheduler_state(enabled: bool, interval_hours: u32) -> Result<(), ServerFnError> {
     use crate::data::booking::BookingManager;
     use crate::settings::Settings;
@@ -330,7 +330,7 @@ pub async fn set_scheduler_state(enabled: bool, interval_hours: u32) -> Result<(
     Ok(())
 }
 
-#[server(UpdateSchedulerInterval)]
+#[server(UpdateSchedulerInterval, prefix = "/api", endpoint = "update_scheduler_interval")]
 pub async fn update_scheduler_interval(interval_hours: u32) -> Result<(), ServerFnError> {
     use crate::data::booking::BookingManager;
     use crate::settings::Settings;
