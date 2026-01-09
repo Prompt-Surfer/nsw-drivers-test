@@ -9,7 +9,7 @@ use std::time::Duration;
 use thirtyfour::components::SelectElement;
 use thirtyfour::prelude::*;
 use thirtyfour::{By, DesiredCapabilities, WebDriver};
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, Mutex};
 
 use super::location::LocationManager;
 use super::shared_booking::{LocationBookings, TimeSlot};
@@ -343,101 +343,210 @@ async fn scrape_single_location(
     Ok(location_result)
 }
 
-/// Attempt recovery after a failed location scrape
-async fn attempt_recovery(driver: &WebDriver, location: &str) {
+/// Navigate back to the location selector page
+async fn navigate_to_location_selector(driver: &WebDriver, settings: &Settings) -> WebDriverResult<()> {
+    let timeout = Duration::from_millis(settings.selenium_element_timout);
+    let polling = Duration::from_millis(settings.selenium_element_polling);
+    
+    // Try clicking "Another Location" link first (most common case)
+    if let Ok(link) = driver.query(By::Id("anotherLocationLink")).first().await {
+        if link.is_displayed().await.unwrap_or(false) {
+            link.click().await?;
+            random_sleep(1000, 2000).await;
+            
+            // Verify we're on the location selector page
+            if driver.query(By::Id("rms_batLocLocSel")).first().await.is_ok() {
+                return Ok(());
+            }
+        }
+    }
+    
+    // Try navigating via the booking management page
+    if let Ok(change_location) = driver.query(By::Id("changeLocationButton")).first().await {
+        if change_location.is_displayed().await.unwrap_or(false) {
+            change_location.click().await?;
+            random_sleep(1000, 2000).await;
+            return Ok(());
+        }
+    }
+    
+    // If all else fails, check if we're already on the location selector
+    driver.query(By::Id("rms_batLocLocSel"))
+        .wait(timeout, polling)
+        .first()
+        .await?;
+    
+    Ok(())
+}
+
+/// Attempt recovery after a failed location scrape - returns true if recovery succeeded
+async fn attempt_recovery(driver: &WebDriver, settings: &Settings, location: &str) -> bool {
     log_page_snapshot(driver, &format!("location-{}", location)).await;
 
-    match driver.query(By::Id("anotherLocationLink")).first().await {
-        Ok(link) => {
-            if link.is_displayed().await.unwrap_or(false) {
-                eprintln!("INFO: Attempting recovery click on 'Another Location'.");
-                if let Err(click_err) = link.click().await {
-                    eprintln!("WARN: Recovery click failed: {}", click_err);
+    // Try to navigate back to location selector
+    match navigate_to_location_selector(driver, settings).await {
+        Ok(_) => {
+            println!("INFO: Recovery successful - back at location selector");
+            true
+        }
+        Err(e) => {
+            eprintln!("WARN: Recovery navigation failed: {}", e);
+            false
+        }
+    }
+}
+
+/// Login with retry logic
+async fn login_with_retry(driver: &WebDriver, settings: &Settings, worker_id: u8, max_retries: u8) -> Result<(), String> {
+    for attempt in 1..=max_retries {
+        match login_and_navigate_to_booking(driver, settings).await {
+            Ok(_) => return Ok(()),
+            Err(e) => {
+                let error_str = e.to_string();
+                eprintln!("ERROR: [Worker {}] Login attempt {}/{} failed: {}", worker_id, attempt, max_retries, error_str);
+                
+                if attempt < max_retries {
+                    // Check if it's a recoverable error (element not found, timeout, etc.)
+                    if error_str.contains("no such element") || error_str.contains("timeout") || error_str.contains("stale") {
+                        println!("INFO: [Worker {}] Retrying login in 3 seconds...", worker_id);
+                        random_sleep(3000, 5000).await;
+                        
+                        // Navigate back to login page for retry
+                        if let Err(nav_err) = driver.goto("https://www.myrta.com/wps/portal/extvp/myrta/login/").await {
+                            eprintln!("WARN: [Worker {}] Failed to navigate to login page: {}", worker_id, nav_err);
+                        }
+                        random_sleep(1000, 2000).await;
+                    } else {
+                        return Err(error_str);
+                    }
+                } else {
+                    return Err(error_str);
                 }
             }
         }
-        Err(_) => {
-            eprintln!("WARN: Recovery link not found.");
-        }
     }
-    random_sleep(2000, 3000).await;
+    Err("Max login retries exceeded".to_string())
 }
 
-/// Run a single worker that scrapes its assigned locations
+/// Run a single worker that pulls work from a shared queue
 async fn run_worker(
     worker_id: u8,
-    locations: Vec<String>,
+    work_queue: Arc<Mutex<Vec<String>>>,
     settings: Settings,
     result_tx: mpsc::Sender<(u8, String, Result<LocationBookings, String>)>,
 ) {
-    println!("INFO: [Worker {}] Starting with {} locations", worker_id, locations.len());
+    println!("INFO: [Worker {}] Starting", worker_id);
     
     let driver = match create_driver(&settings).await {
         Ok(d) => d,
         Err(e) => {
             eprintln!("ERROR: [Worker {}] Failed to create driver: {}", worker_id, e);
-            for location in locations {
-                let _ = result_tx.send((worker_id, location.clone(), Err(format!("Driver creation failed: {}", e)))).await;
-            }
             return;
         }
     };
 
-    if let Err(e) = login_and_navigate_to_booking(&driver, &settings).await {
-        eprintln!("ERROR: [Worker {}] Failed to login: {}", worker_id, e);
+    // Login with retry
+    if let Err(e) = login_with_retry(&driver, &settings, worker_id, 3).await {
+        eprintln!("ERROR: [Worker {}] Failed to login after retries: {}", worker_id, e);
         let _ = driver.quit().await;
-        for location in locations {
-            let _ = result_tx.send((worker_id, location.clone(), Err(format!("Login failed: {}", e)))).await;
-        }
         return;
     }
 
-    println!("INFO: [Worker {}] Login successful, starting to scrape locations", worker_id);
+    println!("INFO: [Worker {}] Login successful, ready to process locations", worker_id);
 
     let location_manager = LocationManager::new();
-    let total = locations.len();
+    let mut consecutive_failures = 0;
+    const MAX_CONSECUTIVE_FAILURES: u8 = 3;
 
-    for (idx, location) in locations.iter().enumerate() {
+    loop {
+        // Get next location from the shared queue
+        let location = {
+            let mut queue = work_queue.lock().await;
+            queue.pop()
+        };
+
+        let location = match location {
+            Some(loc) => loc,
+            None => {
+                println!("INFO: [Worker {}] No more work in queue. Finishing.", worker_id);
+                break;
+            }
+        };
+
         let location_name = location.parse::<u32>()
             .ok()
             .and_then(|id| location_manager.get_by_id(id))
             .map(|loc| loc.name.clone())
             .unwrap_or_else(|| location.clone());
         
-        println!("INFO: [Worker {}] [{}/{}] Processing: {}", worker_id, idx + 1, total, location_name);
+        println!("INFO: [Worker {}] Processing: {}", worker_id, location_name);
 
-        match scrape_single_location(&driver, location, &settings).await {
+        match scrape_single_location(&driver, &location, &settings).await {
             Ok(booking_data) => {
-                println!("INFO: [Worker {}] [{}/{}] {} - {} slots found", 
-                    worker_id, idx + 1, total, location_name, booking_data.slots.len());
+                println!("INFO: [Worker {}] {} - {} slots found", 
+                    worker_id, location_name, booking_data.slots.len());
                 let _ = result_tx.send((worker_id, location.clone(), Ok(booking_data))).await;
+                consecutive_failures = 0;
             }
             Err(e) => {
-                eprintln!("ERROR: [Worker {}] Failed processing {}: {}", worker_id, location_name, e);
-                attempt_recovery(&driver, location).await;
-                let _ = result_tx.send((worker_id, location.clone(), Err(e.to_string()))).await;
+                let error_str = e.to_string();
+                eprintln!("ERROR: [Worker {}] Failed processing {}: {}", worker_id, location_name, error_str);
+                consecutive_failures += 1;
+
+                // Check if this is a session/login error that requires re-login
+                let needs_relogin = error_str.contains("checkTerms") 
+                    || error_str.contains("no such element")
+                    || error_str.contains("invalid session")
+                    || error_str.contains("session deleted");
+
+                if needs_relogin && consecutive_failures < MAX_CONSECUTIVE_FAILURES {
+                    println!("INFO: [Worker {}] Session error detected, attempting re-login...", worker_id);
+                    
+                    // Re-add this location to the queue for retry
+                    {
+                        let mut queue = work_queue.lock().await;
+                        queue.push(location.clone());
+                    }
+                    
+                    // Navigate to login and re-authenticate
+                    if let Err(nav_err) = driver.goto("https://www.myrta.com/wps/portal/extvp/myrta/login/").await {
+                        eprintln!("ERROR: [Worker {}] Failed to navigate to login: {}", worker_id, nav_err);
+                        let _ = result_tx.send((worker_id, location, Err(error_str))).await;
+                        break;
+                    }
+                    
+                    random_sleep(2000, 3000).await;
+                    
+                    if let Err(login_err) = login_with_retry(&driver, &settings, worker_id, 2).await {
+                        eprintln!("ERROR: [Worker {}] Re-login failed: {}", worker_id, login_err);
+                        let _ = result_tx.send((worker_id, location, Err(format!("Re-login failed: {}", login_err)))).await;
+                        break;
+                    }
+                    
+                    println!("INFO: [Worker {}] Re-login successful, continuing work", worker_id);
+                    consecutive_failures = 0;
+                } else if consecutive_failures >= MAX_CONSECUTIVE_FAILURES {
+                    eprintln!("ERROR: [Worker {}] Too many consecutive failures, stopping worker", worker_id);
+                    let _ = result_tx.send((worker_id, location, Err(error_str))).await;
+                    break;
+                } else {
+                    // Try to recover to location selector
+                    if attempt_recovery(&driver, &settings, &location).await {
+                        consecutive_failures = 0;
+                    }
+                    let _ = result_tx.send((worker_id, location, Err(error_str))).await;
+                }
             }
         }
 
         random_sleep(1500, 3000).await;
     }
 
-    println!("INFO: [Worker {}] Finished scraping. Quitting driver.", worker_id);
+    println!("INFO: [Worker {}] Finished. Quitting driver.", worker_id);
     let _ = driver.quit().await;
 }
 
-/// Split locations into chunks for parallel workers
-fn chunk_locations(locations: Vec<String>, num_workers: u8) -> Vec<Vec<String>> {
-    let num_workers = num_workers.max(1) as usize;
-    let chunk_size = (locations.len() + num_workers - 1) / num_workers;
-    
-    locations
-        .chunks(chunk_size)
-        .map(|chunk| chunk.to_vec())
-        .collect()
-}
-
-/// Parallel scraping function that spawns multiple browser workers
+/// Parallel scraping function that spawns multiple browser workers with shared work queue
 pub async fn scrape_rta_parallel<F>(
     locations: Vec<String>,
     settings: &Settings,
@@ -455,22 +564,23 @@ where
     }
 
     let total_locations = locations.len();
-    let chunks = chunk_locations(locations, num_workers);
-    let actual_workers = chunks.len() as u8;
     
-    println!("INFO: Starting parallel scrape with {} workers for {} locations", actual_workers, total_locations);
+    // Create shared work queue (workers pop from the end for efficiency)
+    let work_queue = Arc::new(Mutex::new(locations));
+    
+    println!("INFO: Starting parallel scrape with {} workers for {} locations (shared queue)", num_workers, total_locations);
 
-    let (tx, mut rx) = mpsc::channel::<(u8, String, Result<LocationBookings, String>)>(total_locations);
+    let (tx, mut rx) = mpsc::channel::<(u8, String, Result<LocationBookings, String>)>(total_locations * 2);
     
-    // Spawn workers
+    // Spawn workers - all workers share the same queue
     let mut handles = Vec::new();
-    for (idx, chunk) in chunks.into_iter().enumerate() {
-        let worker_id = idx as u8 + 1;
+    for worker_id in 1..=num_workers {
         let settings_clone = settings.clone();
         let tx_clone = tx.clone();
+        let queue_clone = Arc::clone(&work_queue);
         
         let handle = tokio::spawn(async move {
-            run_worker(worker_id, chunk, settings_clone, tx_clone).await;
+            run_worker(worker_id, queue_clone, settings_clone, tx_clone).await;
         });
         handles.push(handle);
     }
