@@ -4,7 +4,7 @@
 Write-Host "Checking scraping status..." -ForegroundColor Cyan
 
 try {
-    $response = Invoke-WebRequest -Uri "http://127.0.0.1:3000/api/get_scraping_status" -Method GET -TimeoutSec 5 -ErrorAction Stop
+    $response = Invoke-WebRequest -Uri "http://127.0.0.1:3001/api/get_scraping_status" -Method GET -TimeoutSec 5 -ErrorAction Stop
     $status = $response.Content | ConvertFrom-Json
     
     Write-Host ""

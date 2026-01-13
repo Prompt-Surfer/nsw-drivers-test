@@ -30,8 +30,13 @@ if (Test-Path $chromedriverPath) {
     Write-Host "Warning: ChromeDriver not found at $chromedriverPath" -ForegroundColor Yellow
 }
 
-Write-Host "Starting Leptos server..." -ForegroundColor Cyan
-Write-Host "Server will be available at http://127.0.0.1:3000" -ForegroundColor Green
+Write-Host "Starting Leptos server (release build)..." -ForegroundColor Cyan
+Write-Host "Server will be available at http://127.0.0.1:3001" -ForegroundColor Green
 Write-Host ""
 
-cargo leptos serve
+# Run the pre-built release binary directly (no compilation)
+$env:LEPTOS_SITE_ROOT = "target/site"
+$env:LEPTOS_SITE_PKG_DIR = "pkg"
+$env:LEPTOS_SITE_ADDR = "127.0.0.1:3001"
+$env:LEPTOS_RELOAD_PORT = "3002"
+.\target\release\nsw-closest-display.exe
