@@ -123,6 +123,11 @@ async fn login_and_navigate_to_booking(driver: &WebDriver, settings: &Settings) 
         .first()
         .await?;
     random_sleep(200, 500).await;
+    
+    // Clear any existing text before typing (handles retry scenarios with leftover text)
+    username_input.clear().await?;
+    random_sleep(100, 200).await;
+    
     type_like_human(&username_input, &settings.username, 60, 180).await?;
     random_sleep(300, 700).await;
 
@@ -133,6 +138,11 @@ async fn login_and_navigate_to_booking(driver: &WebDriver, settings: &Settings) 
         .await?;
 
     random_sleep(200, 500).await;
+    
+    // Clear any existing text before typing
+    password_input.clear().await?;
+    random_sleep(100, 200).await;
+    
     type_like_human(&password_input, &settings.password, 60, 180).await?;
     random_sleep(400, 800).await;
 
@@ -436,6 +446,15 @@ async fn run_worker(
     result_tx: mpsc::Sender<(u8, String, Result<LocationBookings, String>)>,
 ) {
     println!("INFO: [Worker {}] Starting", worker_id);
+    
+    // Check if there's any work before starting browser
+    {
+        let queue = work_queue.lock().await;
+        if queue.is_empty() {
+            println!("INFO: [Worker {}] No work in queue, exiting without starting browser", worker_id);
+            return;
+        }
+    }
     
     let driver = match create_driver(&settings).await {
         Ok(d) => d,

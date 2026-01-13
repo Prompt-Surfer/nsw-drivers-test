@@ -92,7 +92,7 @@ end2end-dir = "end2end"
 browserquery = "defaults"
 
 # The environment Leptos will run in, usually either "DEV" or "PROD"
-env = "PROD"
+env = "DEV"
 
 # The name of the binary target to use
 bin-target = "nsw-closest-display"
