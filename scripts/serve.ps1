@@ -26,7 +26,7 @@ $env:LEPTOS_TAILWIND_VERSION = "v4.1.18"
 # Start ChromeDriver
 $chromedriverPath = ".\chromedriver-win64\chromedriver.exe"
 if (Test-Path $chromedriverPath) {
-    Start-Process -FilePath $chromedriverPath -ArgumentList "--port=57909", "--allowed-origins=*" -WindowStyle Hidden
+    Start-Process -FilePath $chromedriverPath -ArgumentList "--port=57909", "--allowed-origins=*"
     Write-Host "ChromeDriver started on port 57909" -ForegroundColor Green
     Start-Sleep -Seconds 2
 } else {

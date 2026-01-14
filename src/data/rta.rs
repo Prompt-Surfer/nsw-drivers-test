@@ -321,6 +321,38 @@ async fn scrape_single_location(
 
     random_sleep(1000, 2500).await;
 
+    // Try to navigate forward in calendar to get more months (up to 6 months ahead)
+    // The RTA site might show limited slots initially
+    for month_iter in 0..6 {
+        // Try clicking "Next Month" or similar navigation
+        let nav_selectors = vec![
+            "a.ui-datepicker-next",      // jQuery datepicker next
+            ".ui-datepicker-next",
+            "button.next-month",
+            ".calendar-next",
+            "[data-action='next']",
+        ];
+        
+        let mut clicked = false;
+        for selector in &nav_selectors {
+            if let Ok(nav_btn) = driver.query(By::Css(selector)).first().await {
+                if nav_btn.is_clickable().await.unwrap_or(false) {
+                    if let Ok(()) = nav_btn.click().await {
+                        println!("DEBUG: [{}] Clicked calendar navigation (iter {})", location, month_iter);
+                        random_sleep(1500, 2500).await;
+                        clicked = true;
+                        break;
+                    }
+                }
+            }
+        }
+        
+        if !clicked {
+            // No more navigation available
+            break;
+        }
+    }
+
     let timeslots = driver.execute("return timeslots", vec![]).await?;
 
     let next_available_date = timeslots.json()
@@ -336,6 +368,16 @@ async fn scrape_single_location(
         .and_then(|slots| slots.get("listTimeSlot"))
         .and_then(|list| serde_json::from_value(list.clone()).ok())
         .unwrap_or_else(Vec::new);
+
+    // Debug: Log slot date range to diagnose missing months
+    if !slots.is_empty() {
+        let first_date = slots.first().map(|s| &s.start_time);
+        let last_date = slots.last().map(|s| &s.start_time);
+        println!("DEBUG: [{}] Slot date range: {:?} to {:?} ({} total slots)", 
+            location, first_date, last_date, slots.len());
+    } else {
+        println!("DEBUG: [{}] No slots returned from RTA", location);
+    }
 
     let location_result = LocationBookings {
         location: location.to_string(),
@@ -575,19 +617,27 @@ pub async fn scrape_rta_parallel<F>(
 where
     F: FnMut(LocationBookings, &str),
 {
-    let num_workers = settings.parallel_workers.max(1);
+    let total_locations = locations.len();
+    
+    // Optimize worker count: don't spawn more workers than tasks
+    // If queue has ≤3 tasks, set workers = queue size to avoid unused workers
+    let configured_workers = settings.parallel_workers.max(1);
+    let num_workers = if total_locations <= 3 {
+        (total_locations as u8).max(1)
+    } else {
+        configured_workers.min(total_locations as u8)
+    };
     
     if num_workers == 1 {
         // Fall back to sequential scraping for single worker
         return scrape_rta_timeslots_incremental(locations, settings, file_path, on_location_scraped).await;
     }
 
-    let total_locations = locations.len();
-    
     // Create shared work queue (workers pop from the end for efficiency)
     let work_queue = Arc::new(Mutex::new(locations));
     
-    println!("INFO: Starting parallel scrape with {} workers for {} locations (shared queue)", num_workers, total_locations);
+    println!("INFO: Starting parallel scrape with {} workers for {} locations (configured: {}, optimized)", 
+        num_workers, total_locations, configured_workers);
 
     let (tx, mut rx) = mpsc::channel::<(u8, String, Result<LocationBookings, String>)>(total_locations * 2);
     
