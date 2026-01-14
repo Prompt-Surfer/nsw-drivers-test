@@ -323,18 +323,17 @@ async fn scrape_single_location(
 
     // Try to navigate forward in calendar to get more months (up to 6 months ahead)
     // The RTA site might show limited slots initially
+    let nav_selectors = [
+        "a.ui-datepicker-next",      // jQuery datepicker next
+        ".ui-datepicker-next",
+        "button.next-month",
+        ".calendar-next",
+        "[data-action='next']",
+    ];
+    
     for month_iter in 0..6 {
-        // Try clicking "Next Month" or similar navigation
-        let nav_selectors = vec![
-            "a.ui-datepicker-next",      // jQuery datepicker next
-            ".ui-datepicker-next",
-            "button.next-month",
-            ".calendar-next",
-            "[data-action='next']",
-        ];
-        
         let mut clicked = false;
-        for selector in &nav_selectors {
+        for selector in nav_selectors {
             if let Ok(nav_btn) = driver.query(By::Css(selector)).first().await {
                 if nav_btn.is_clickable().await.unwrap_or(false) {
                     if let Ok(()) = nav_btn.click().await {
