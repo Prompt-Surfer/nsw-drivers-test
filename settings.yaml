@@ -9,14 +9,6 @@ retries: 4
 scrape_refresh_time_min: 120
 locations:
 - '621'
-- '17'
-- '96'
-- '241'
-- '63'
-- '35'
-- '601'
-- '37'
-- '112'
 date_filter_start: 2026-02-01
 date_filter_end: 2026-09-30
 alerts:
@@ -30,7 +22,7 @@ alerts:
   - 6
 - location_id: '17'
   location_name: Albury
-  enabled: true
+  enabled: false
   months:
   - 3
   - 4
@@ -38,7 +30,7 @@ alerts:
   - 6
 - location_id: '96'
   location_name: Ryde
-  enabled: true
+  enabled: false
   months:
   - 3
   - 4
@@ -46,7 +38,7 @@ alerts:
   - 6
 - location_id: '241'
   location_name: Silverwater
-  enabled: true
+  enabled: false
   months:
   - 3
   - 4
@@ -54,7 +46,7 @@ alerts:
   - 6
 - location_id: '63'
   location_name: Hornsby
-  enabled: true
+  enabled: false
   months:
   - 3
   - 4
@@ -62,7 +54,7 @@ alerts:
   - 6
 - location_id: '35'
   location_name: Castle Hill
-  enabled: true
+  enabled: false
   months:
   - 3
   - 4
@@ -70,7 +62,7 @@ alerts:
   - 6
 - location_id: '601'
   location_name: Auburn PCYC
-  enabled: true
+  enabled: false
   months:
   - 3
   - 4
@@ -78,7 +70,7 @@ alerts:
   - 6
 - location_id: '37'
   location_name: Chatswood
-  enabled: true
+  enabled: false
   months:
   - 3
   - 4
@@ -86,7 +78,7 @@ alerts:
   - 6
 - location_id: '112'
   location_name: Auburn
-  enabled: true
+  enabled: false
   months:
   - 3
   - 4

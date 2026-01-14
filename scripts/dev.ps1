@@ -20,6 +20,9 @@ if (Test-Path .env) {
 # Refresh PATH
 $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
 
+# Set Tailwind version to avoid version mismatch warning
+$env:LEPTOS_TAILWIND_VERSION = "v4.1.18"
+
 # Start ChromeDriver
 $chromedriverPath = ".\chromedriver-win64\chromedriver.exe"
 if (Test-Path $chromedriverPath) {
