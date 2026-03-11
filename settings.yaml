@@ -1,7 +1,7 @@
 headless: false
 username: ${MYRTA_USERNAME}
 password: ${MYRTA_PASSWORD}
-have_booking: false
+have_booking: true
 selenium_driver_url: http://localhost:57909
 selenium_element_timout: 20000
 selenium_element_polling: 100

@@ -33,8 +33,12 @@ if (Test-Path $chromedriverPath) {
     Write-Host "Warning: ChromeDriver not found at $chromedriverPath" -ForegroundColor Yellow
 }
 
+# Auto-login after server is ready (runs in background so it doesn't block serve)
+$loginScript = Join-Path $ProjectRoot "scripts\login.ps1"
+Start-Process powershell -ArgumentList "-NoProfile", "-File", $loginScript -NoNewWindow
+
 Write-Host "Starting Leptos server..." -ForegroundColor Cyan
-Write-Host "Server will be available at http://127.0.0.1:3000" -ForegroundColor Green
+Write-Host "Server will be available at http://127.0.0.1:3001" -ForegroundColor Green
 Write-Host ""
 
 cargo leptos serve

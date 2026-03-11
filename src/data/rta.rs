@@ -82,8 +82,9 @@ async fn create_driver(settings: &Settings) -> WebDriverResult<WebDriver> {
     caps.add_arg("--no-sandbox")?;
     caps.add_arg("--disable-dev-shm-usage")?;
     caps.add_arg("--disable-gpu")?;
+    caps.add_arg("--disable-extensions")?;
     caps.add_arg("--window-size=1920,1080")?;
-    caps.add_arg("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36")?;
+    caps.add_arg("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36")?;
 
     let driver = WebDriver::new(settings.selenium_driver_url.clone(), caps).await?;
 
@@ -156,9 +157,14 @@ async fn login_and_navigate_to_booking(driver: &WebDriver, settings: &Settings) 
 
     random_sleep(2000, 4000).await;
 
+    let post_login_url = driver.current_url().await.map(|u| u.to_string()).unwrap_or_else(|_| "unknown".to_string());
+    let post_login_title = driver.title().await.unwrap_or_else(|_| "unknown".to_string());
+    println!("INFO: Post-login page — URL: {} | Title: {}", post_login_url, post_login_title);
+
     if settings.have_booking {
         let manage_booking = driver
-            .query(By::XPath("//*[text()=\"Manage booking\"]"))
+            .query(By::XPath("//*[contains(translate(text(),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'manage') and contains(translate(text(),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'booking')]"))
+            .wait(timeout, polling)
             .first()
             .await?;
         manage_booking
@@ -253,9 +259,19 @@ async fn login_and_navigate_to_booking(driver: &WebDriver, settings: &Settings) 
 pub async fn login_to_portal_only(settings: &Settings) -> WebDriverResult<String> {
     println!("INFO: Opening browser and logging into RTA portal...");
     
-    let driver = create_driver(settings).await?;
+    let driver = match create_driver(settings).await {
+        Ok(d) => d,
+        Err(e) => {
+            eprintln!("ERROR: Failed to create ChromeDriver session: {}", e);
+            return Err(e);
+        }
+    };
     
-    login_and_navigate_to_booking(&driver, settings).await?;
+    if let Err(e) = login_and_navigate_to_booking(&driver, settings).await {
+        eprintln!("ERROR: Login failed: {}", e);
+        let _ = driver.quit().await;
+        return Err(e);
+    }
     
     // Get the current URL to confirm we're on the right page
     let current_url = driver.current_url().await?;
@@ -704,8 +720,9 @@ where
     caps.add_arg("--no-sandbox")?;
     caps.add_arg("--disable-dev-shm-usage")?;
     caps.add_arg("--disable-gpu")?;
+    caps.add_arg("--disable-extensions")?;
     caps.add_arg("--window-size=1920,1080")?;
-    caps.add_arg("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36");
+    caps.add_arg("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36");
 
     let driver = WebDriver::new(settings.selenium_driver_url.clone(), caps).await?;
 
@@ -769,7 +786,8 @@ where
 
     if settings.have_booking {
         let manage_booking = driver
-            .query(By::XPath("//*[text()=\"Manage booking\"]"))
+            .query(By::XPath("//*[contains(translate(text(),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'manage') and contains(translate(text(),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'booking')]"))
+            .wait(timeout, polling)
             .first()
             .await?;
         manage_booking
@@ -1001,8 +1019,9 @@ pub async fn scrape_rta_timeslots(
     caps.add_arg("--no-sandbox")?;
     caps.add_arg("--disable-dev-shm-usage")?;
     caps.add_arg("--disable-gpu")?;
+    caps.add_arg("--disable-extensions")?;
     caps.add_arg("--window-size=1920,1080")?;
-    caps.add_arg("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36");
+    caps.add_arg("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36");
 
     let driver = WebDriver::new(settings.selenium_driver_url.clone(), caps).await?;
 
@@ -1065,7 +1084,8 @@ pub async fn scrape_rta_timeslots(
 
     if settings.have_booking {
         let manage_booking = driver
-            .query(By::XPath("//*[text()=\"Manage booking\"]"))
+            .query(By::XPath("//*[contains(translate(text(),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'manage') and contains(translate(text(),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'booking')]"))
+            .wait(timeout, polling)
             .first()
             .await?;
         manage_booking
