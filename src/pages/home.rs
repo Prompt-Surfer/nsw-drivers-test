@@ -1172,7 +1172,7 @@ pub fn HomePage() -> impl IntoView {
 
                 <div class="flex gap-2">
                     <a
-                        href="https://github.com/teehee567/nsw-drivers-test"
+                        href="https://github.com/Prompt-Surfer/nsw-drivers-test"
                         target="_blank"
                         class="px-3 py-1.5 bg-gray-800 text-white rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors inline-flex items-center justify-center gap-2"
                     >
